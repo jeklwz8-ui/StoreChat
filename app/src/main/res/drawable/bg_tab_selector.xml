@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 选中状态：使用白色圆角背景 -->
+    <item android:drawable="@drawable/bg_tab_selected" android:state_selected="true" />
+    <!-- 默认状态：透明背景 -->
+    <item android:drawable="@android:color/transparent" />
+</selector>

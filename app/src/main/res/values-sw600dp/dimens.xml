@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dimensions for tablets (sw600dp) -->
+    <dimen name="common_margin">16dp</dimen>
+    <dimen name="common_half_margin">2dp</dimen>
+
+    <dimen name="home_search_height">66dp</dimen>
+    <dimen name="home_search_bg_height">50dp</dimen>
+    <dimen name="home_search_top_margin">15dp</dimen>
+    <dimen name="home_icon_size">30dp</dimen>
+
+    <dimen name="home_card_top_margin">0dp</dimen>
+    <dimen name="home_card_bottom_margin">48dp</dimen>
+    <dimen name="card_corner_radius">18dp</dimen>
+
+    <dimen name="home_tab_height">66dp</dimen>
+    <dimen name="home_tab_indicator_height">5dp</dimen>
+
+    <dimen name="text_size_small">16sp</dimen>
+    <dimen name="text_size_normal">20sp</dimen>
+</resources>

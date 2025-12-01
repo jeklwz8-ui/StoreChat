@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <data>
+        <variable
+            name="version"
+            type="com.example.storechat.model.HistoryVersion" />
+    </data>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:paddingVertical="8dp">
+
+        <ImageView
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:src="@drawable/ic_apk_green"
+            android:contentDescription="@null" />
+
+        <TextView
+            android:id="@+id/tvVersionName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text='@{"v." + version.versionName}'
+            android:textSize="12sp"
+            android:textColor="@color/text_secondary"
+            tools:text="v.1.01" />
+
+        <Button
+            android:id="@+id/btnInstall"
+            android:layout_width="wrap_content"
+            android:layout_height="30dp"
+            android:layout_marginTop="4dp"
+            android:minWidth="72dp"
+            android:text="安装"
+            android:textAllCaps="false"
+            android:textColor="@android:color/white"
+            android:textSize="8sp"
+            android:background="@drawable/bg_btn_action" />
+    </LinearLayout>
+</layout>
