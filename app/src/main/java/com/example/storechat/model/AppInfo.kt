@@ -20,6 +20,7 @@ enum class InstallState {
  * 表示一个应用程序的信息。
  *
  * @property name 应用程序的名称。
+ * @property category 应用程序的分类。
  * @property description 应用程序的描述。
  * @property size 应用程序的大小。
  * @property downloadCount 应用程序的下载次数。
@@ -33,6 +34,7 @@ enum class InstallState {
  */
 data class AppInfo(
     val name: String,
+    val category: AppCategory,
     val description: String?,
     val size: String,
     val downloadCount: Int,

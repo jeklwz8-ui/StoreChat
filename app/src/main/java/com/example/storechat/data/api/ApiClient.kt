@@ -1,0 +1,38 @@
+package com.example.storechat.data.api
+
+import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
+
+/**
+ * Retrofit 客户端单例
+ * 之后只需要在这里把 BASE_URL 改成你后台地址即可
+ */
+object ApiClient {
+
+    // TODO: 接入真实接口时，替换成你的服务地址（必须以 / 结尾）
+    private const val BASE_URL = "http://127.0.0.1/"
+
+    private val loggingInterceptor: HttpLoggingInterceptor by lazy {
+        HttpLoggingInterceptor().apply {
+            // 调试阶段打印请求/响应日志，方便排查问题
+            level = HttpLoggingInterceptor.Level.BODY
+        }
+    }
+
+    private val okHttpClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .addInterceptor(loggingInterceptor)
+            .build()
+    }
+
+    val appApi: AppApiService by lazy {
+        Retrofit.Builder()
+            .baseUrl(BASE_URL)
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(AppApiService::class.java)
+    }
+}

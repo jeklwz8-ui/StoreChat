@@ -1,10 +1,13 @@
 package com.example.storechat.data
 
 import androidx.lifecycle.LiveData
+import androidx.lifecycle.MediatorLiveData
 import androidx.lifecycle.MutableLiveData
+import com.example.storechat.data.api.ApiClient
 import com.example.storechat.model.AppCategory
 import com.example.storechat.model.AppInfo
 import com.example.storechat.model.DownloadStatus
+import com.example.storechat.model.HistoryVersion
 import com.example.storechat.model.InstallState
 import com.example.storechat.model.UpdateStatus
 import com.example.storechat.xc.XcServiceManager
@@ -22,6 +25,9 @@ object AppRepository {
     private val coroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val downloadJobs = mutableMapOf<String, Job>()
 
+    //统一Retorize 接口
+    private val apiService = ApiClient.appApi
+
     private val _appVersion = MutableLiveData("V1.0.0")
     val appVersion: LiveData<String> = _appVersion
     private val _checkUpdateResult = MutableLiveData<UpdateStatus?>()
@@ -31,6 +37,7 @@ object AppRepository {
         coroutineScope.launch {
             delay(800L)
             val current = _appVersion.value?.removePrefix("V") ?: "1.0.0"
+            // 这里仍然是模拟，后面可换成 apiService.checkUpdate(...)
             val latestFromServer = "1.0.1"
             val status = if (latestFromServer == current) UpdateStatus.LATEST else UpdateStatus.NEW_VERSION(latestFromServer)
             _checkUpdateResult.postValue(status)
@@ -40,14 +47,23 @@ object AppRepository {
     fun clearUpdateResult() {
         _checkUpdateResult.postValue(null)
     }
-
-    private val categorizedData: Map<AppCategory, List<AppInfo>>
-    private val _allApps = MutableLiveData<List<AppInfo>>()
+    // 应用列表 & 分类
+    private val _allApps = MutableLiveData<List<AppInfo>>(emptyList())
     val allApps: LiveData<List<AppInfo>> = _allApps
-    private val _categorizedApps = MutableLiveData<List<AppInfo>>()
-    val categorizedApps: LiveData<List<AppInfo>> = _categorizedApps
 
-    //下载接口
+    private val _selectedCategory = MutableLiveData(AppCategory.YANNUO)
+
+    // 由 allApps 和 selectedCategory 派生出分类应用列表
+    val categorizedApps: LiveData<List<AppInfo>> = MediatorLiveData<List<AppInfo>>().apply {
+        addSource(allApps) { apps ->
+            value = apps.filter { it.category == _selectedCategory.value }
+        }
+        addSource(_selectedCategory) { category ->
+            value = allApps.value?.filter { it.category == category }
+        }
+    }
+
+    //下载接口 & 最近安装
     private val _downloadQueue = MutableLiveData<List<AppInfo>>(emptyList())
     val downloadQueue: LiveData<List<AppInfo>> = _downloadQueue
 
@@ -55,50 +71,77 @@ object AppRepository {
     val recentInstalledApps: LiveData<List<AppInfo>> = _recentInstalledApps
 
     init {
-        categorizedData = mapOf(
-            AppCategory.YANNUO to listOf(
-                AppInfo(
-                    name = "应用名称A", description = "应用简介说明...", size = "83MB",
-                    downloadCount = 1002, packageName = "com.demo.appa",
-                    apkPath = "/sdcard/apks/app_a.apk", installState = InstallState.INSTALLED_LATEST,
-                    versionName = "1.0.3", releaseDate = "2025-11-12"
-                ),
-                AppInfo(
-                    name = "应用名称B", description = "应用简介说明...", size = "83MB",
-                    downloadCount = 1003, packageName = "com.demo.appb",
-                    apkPath = "/sdcard/apks/app_b.apk", installState = InstallState.INSTALLED_LATEST,
-                    versionName = "1.0.1", releaseDate = "2025-10-20"
-                )
+        val initialApps = listOf(
+            AppInfo(
+                name = "应用名称A", description = "应用简介说明...", size = "83MB",
+                downloadCount = 1002, packageName = "com.demo.appa",
+                apkPath = "/sdcard/apks/app_a.apk", installState = InstallState.INSTALLED_LATEST,
+                versionName = "1.0.3", releaseDate = "2025-11-12", category = AppCategory.YANNUO
             ),
-            AppCategory.ICBC to listOf(
-                AppInfo(
-                    name = "工行掌上银行", description = "工行官方移动银行客户端", size = "80MB",
-                    downloadCount = 500000, packageName = "com.icbc.mobilebank",
-                    apkPath = "/sdcard/apks/icbc_mobilebank.apk", installState = InstallState.NOT_INSTALLED,
-                    versionName = "8.2.0.1.1", releaseDate = "2025-11-05"
-                )
+            AppInfo(
+                name = "应用名称B", description = "应用简介说明...", size = "83MB",
+                downloadCount = 1003, packageName = "com.demo.appb",
+                apkPath = "/sdcard/apks/app_b.apk", installState = InstallState.INSTALLED_LATEST,
+                versionName = "1.0.1", releaseDate = "2025-10-20", category = AppCategory.YANNUO
             ),
-            AppCategory.CCB to listOf(
-                AppInfo(
-                    name = "建行生活", description = "吃喝玩乐建行优惠", size = "70MB",
-                    downloadCount = 300000, packageName = "com.ccb.life",
-                    apkPath = "/sdcard/apks/ccb_life.apk", installState = InstallState.NOT_INSTALLED,
-                    versionName = "3.2.1", releaseDate = "2025-11-08"
-                )
+            AppInfo(
+                name = "工行掌上银行", description = "工行官方移动银行客户端", size = "80MB",
+                downloadCount = 500000, packageName = "com.icbc.mobilebank",
+                apkPath = "/sdcard/apks/icbc_mobilebank.apk", installState = InstallState.NOT_INSTALLED,
+                versionName = "8.2.0.1.1", releaseDate = "2025-11-05", category = AppCategory.ICBC
+            ),
+            AppInfo(
+                name = "建行生活", description = "吃喝玩乐建行优惠", size = "70MB",
+                downloadCount = 300000, packageName = "com.ccb.life",
+                apkPath = "/sdcard/apks/ccb_life.apk", installState = InstallState.NOT_INSTALLED,
+                versionName = "3.2.1", releaseDate = "2025-11-08", category = AppCategory.CCB
             )
         )
-        _allApps.postValue(categorizedData.values.flatten())
-        _categorizedApps.postValue(categorizedData[AppCategory.YANNUO] ?: emptyList())
+        _allApps.postValue(initialApps)
+
+        //    启动时尝试用接口刷新默认分类（如果接口未通，会自动忽略异常）
+        coroutineScope.launch {
+            refreshAppsFromServer(AppCategory.YANNUO)
+        }
     }
 
+
+    /**
+     * UI 选择分类时调用
+     */
     fun selectCategory(category: AppCategory) {
-        _categorizedApps.postValue(categorizedData[category] ?: emptyList())
+        _selectedCategory.postValue(category)
+        coroutineScope.launch {
+            refreshAppsFromServer(category)
+        }
     }
 
+    /**
+     * a. 应用列表接口：按分类从服务端获取列表
+     * 目前失败时静默忽略，保留本地数据
+     */
+    private suspend fun refreshAppsFromServer(category: AppCategory) {
+        try {
+            val categoryParam = when (category) {
+                AppCategory.YANNUO -> "1"
+                AppCategory.ICBC -> "2"
+                AppCategory.CCB -> "3"
+            }
+            val remoteList = apiService.getAppList(categoryParam)
+
+            // 更新 allApps 列表
+            _allApps.value?.let { currentApps ->
+                val otherApps = currentApps.filter { it.category != category }
+                _allApps.postValue(otherApps + remoteList)
+            }
+        } catch (e: Exception) {
+            // 接口未通或报错时保持原有本地数据即可
+        }
+    }
+
+    //内部工具函数
     private fun findApp(packageName: String): AppInfo? {
-        return _allApps.value?.find { it.packageName == packageName } ?:
-               _categorizedApps.value?.find { it.packageName == packageName } ?:
-               _downloadQueue.value?.find { it.packageName == packageName }
+        return _allApps.value?.find { it.packageName == packageName }
     }
 
     private fun updateAppStatus(packageName: String, transform: (AppInfo) -> AppInfo) {
@@ -109,17 +152,38 @@ object AppRepository {
             _allApps.postValue(list.map { if (it.packageName == packageName) newApp else it })
         }
 
-        _categorizedApps.value?.let { list ->
-            _categorizedApps.postValue(list.map { if (it.packageName == packageName) newApp else it })
-        }
-
         _downloadQueue.value?.let { list ->
-            _downloadQueue.postValue(list.map { if (it.packageName == packageName) newApp else it })
+            if (list.any{ it.packageName == packageName }) {
+                _downloadQueue.postValue(list.map { if (it.packageName == packageName) newApp else it })
+            }
         }
     }
 
 
-    //下载接口连接
+    /**
+     * b. 统一封装“下载链接获取逻辑”
+     * - 接入接口后只要改这里，不用改 UI 和其他业务代码
+     */
+    private suspend fun resolveDownloadApkPath(
+        packageName: String,
+        fallbackApkPath: String,
+        versionName: String?
+    ): String {
+        return try {
+            val resp = apiService.getDownloadLink(
+                packageName = packageName,
+                versionName = versionName
+            )
+            val url = resp.url
+            if (url.isBlank()) fallbackApkPath else url
+        } catch (e: Exception) {
+            // 接口失败时直接用原来的 apkPath，保证 Demo 仍可运行
+            fallbackApkPath
+        }
+    }
+
+
+    //    下载队列 & 安装逻辑
     fun toggleDownload(app: AppInfo) {
         when (app.downloadStatus) {
             DownloadStatus.DOWNLOADING -> {
@@ -134,6 +198,12 @@ object AppRepository {
                 }
 
                 val newJob = coroutineScope.launch {
+//                   先解析出真正要用的 apk 下载地址（接口 or 本地路径）
+                    val realApkPath = resolveDownloadApkPath(
+                        packageName = app.packageName,
+                        fallbackApkPath = app.apkPath,
+                        versionName = app.versionName
+                    )
                     updateAppStatus(app.packageName) { it.copy(downloadStatus = DownloadStatus.DOWNLOADING) }
 
                     for (p in app.progress..100) {
@@ -168,21 +238,74 @@ object AppRepository {
                 }
                 downloadJobs[app.packageName] = newJob
             }
-            DownloadStatus.VERIFYING, DownloadStatus.INSTALLING -> {}
+            DownloadStatus.VERIFYING, DownloadStatus.INSTALLING -> {
+                //忽略
+            }
         }
     }
 
     fun cancelDownload(app: AppInfo) {
         downloadJobs[app.packageName]?.cancel()
         downloadJobs.remove(app.packageName)
-        _downloadQueue.value?.let { list ->
-            _downloadQueue.postValue(list.filterNot { it.packageName == app.packageName })
-        }
         updateAppStatus(app.packageName) {
             it.copy(
                 downloadStatus = DownloadStatus.NONE,
                 progress = 0
             )
+        }
+    }
+
+    fun removeDownload(app: AppInfo) {
+        _downloadQueue.value?.let { list ->
+            _downloadQueue.postValue(list.filterNot { it.packageName == app.packageName })
+        }
+    }
+    // ---------------- c. 历史版本列表 & 安装 ----------------
+
+    /**
+     * 历史版本列表接口预留：
+     * - 先尝试从接口获取
+     * - 接口失败或返回空，则回退到本地假数据
+     */
+    suspend fun loadHistoryVersions(app: AppInfo): List<HistoryVersion> {
+        return try {
+            val versions = apiService.getAppHistory(app.packageName)
+            if (versions.isNotEmpty()) {
+                versions.map { versionInfo ->
+                    HistoryVersion(
+                        versionName = versionInfo.versionName,
+                        apkPath = versionInfo.apkPath
+                    )
+                }
+            } else {
+                buildFakeHistory(app)
+            }
+        } catch (e: Exception) {
+            buildFakeHistory(app)
+        }
+    }
+
+    private fun buildFakeHistory(app: AppInfo): List<HistoryVersion> {
+        return listOf(
+            HistoryVersion("1.0.2", "/sdcard/apks/${app.packageName}_102.apk"),
+            HistoryVersion("1.0.1", "/sdcard/apks/${app.packageName}_101.apk"),
+            HistoryVersion("1.0.0", "/sdcard/apks/${app.packageName}_100.apk")
+        )
+    }
+
+    /**
+     * 历史版本安装：
+     * - 被 HistoryVersionFragment 在点击“安装”时调用
+     * - 内部同样通过 resolveDownloadApkPath 统一处理下载链接
+     */
+    fun installHistoryVersion(packageName: String, historyVersion: HistoryVersion) {
+        coroutineScope.launch {
+            val realApkPath = resolveDownloadApkPath(
+                packageName = packageName,
+                fallbackApkPath = historyVersion.apkPath,
+                versionName = historyVersion.versionName
+            )
+            XcServiceManager.installApk(realApkPath, packageName, true)
         }
     }
 }

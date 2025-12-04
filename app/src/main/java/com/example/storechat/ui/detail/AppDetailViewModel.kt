@@ -5,9 +5,11 @@ import androidx.lifecycle.MediatorLiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.switchMap
+import androidx.lifecycle.viewModelScope
 import com.example.storechat.data.AppRepository
 import com.example.storechat.model.AppInfo
 import com.example.storechat.model.HistoryVersion
+import kotlinx.coroutines.launch
 
 class AppDetailViewModel : ViewModel() {
 
@@ -39,12 +41,19 @@ class AppDetailViewModel : ViewModel() {
      * 加载指定应用的历史版本（目前使用假数据）
      */
     fun loadHistoryFor(app: AppInfo) {
+
+        viewModelScope.launch {
+            val history = AppRepository.loadHistoryVersions(app)
+            _historyVersions.postValue(history)
+        }
+
+
         // 在真实项目中，这里应该从数据库或网络加载
-        val fakeHistory = listOf(
-            HistoryVersion("1.0.2", "/sdcard/apks/${app.packageName}_102.apk"),
-            HistoryVersion("1.0.1", "/sdcard/apks/${app.packageName}_101.apk"),
-            HistoryVersion("1.0.0", "/sdcard/apks/${app.packageName}_100.apk")
-        )
-        _historyVersions.value = fakeHistory
+//        val fakeHistory = listOf(
+//            HistoryVersion("1.0.2", "/sdcard/apks/${app.packageName}_102.apk"),
+//            HistoryVersion("1.0.1", "/sdcard/apks/${app.packageName}_101.apk"),
+//            HistoryVersion("1.0.0", "/sdcard/apks/${app.packageName}_100.apk")
+//        )
+//        _historyVersions.value = fakeHistory
     }
 }

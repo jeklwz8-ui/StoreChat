@@ -117,7 +117,10 @@ class DownloadQueueViewModel : ViewModel() {
      * 通过取消按钮触发
      */
     fun cancelDownload() {
-        activeTask.value?.let { AppRepository.cancelDownload(it.app) }
+        activeTask.value?.let {
+            AppRepository.cancelDownload(it.app)
+            AppRepository.removeDownload(it.app)
+        }
         _toastMessage.value = "下载已取消"
     }
 

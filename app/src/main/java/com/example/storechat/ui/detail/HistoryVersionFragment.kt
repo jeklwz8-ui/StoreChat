@@ -7,6 +7,7 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
+import com.example.storechat.data.AppRepository
 import com.example.storechat.databinding.FragmentHistoryVersionBinding
 import com.example.storechat.xc.XcServiceManager
 
@@ -55,14 +56,27 @@ class HistoryVersionFragment : Fragment() {
             }
 
             // 点击“安装”按钮，直接调用安装服务
-            Toast.makeText(requireContext(), "开始安装：${historyVersion.versionName}", Toast.LENGTH_SHORT).show()
-            XcServiceManager.installApk(
-                apkPath = historyVersion.apkPath,
+            // 内部会先根据下载链接接口生成有效期 URL，再调用静默安装服务
+            Toast.makeText(
+                requireContext(),
+                "开始安装：${historyVersion.versionName}",
+                Toast.LENGTH_SHORT
+            ).show()
+
+            AppRepository.installHistoryVersion(
                 packageName = currentApp.packageName,
-                openAfter = true
+                historyVersion = historyVersion
             )
         }
         binding.recyclerHistory.adapter = adapter
+
+//            XcServiceManager.installApk(
+//                apkPath = historyVersion.apkPath,
+//                packageName = currentApp.packageName,
+//                openAfter = true
+//            )
+//        }
+//        binding.recyclerHistory.adapter = adapter
     }
 
     private fun observeViewModel() {

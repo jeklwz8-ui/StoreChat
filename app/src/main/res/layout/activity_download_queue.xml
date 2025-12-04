@@ -143,7 +143,7 @@
                                 android:layout_height="wrap_content"
                                 android:layout_marginStart="12dp"
                                 android:layout_marginEnd="8dp"
-                                android:text="@{viewModel.appName + ` (` + viewModel.progressText + `)`}"
+                                android:text="@{viewModel.appName}"
                                 android:textColor="@color/text_primary"
                                 android:textSize="15sp"
                                 android:maxLines="1"
@@ -222,6 +222,9 @@
                         </androidx.constraintlayout.widget.ConstraintLayout>
                     </com.google.android.material.card.MaterialCardView>
                 </androidx.constraintlayout.widget.ConstraintLayout>
+                
+                
+                
 
                 <!-- Recently Installed Section -->
                 <LinearLayout
