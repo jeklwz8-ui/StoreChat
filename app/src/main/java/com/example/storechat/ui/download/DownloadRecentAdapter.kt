@@ -110,15 +110,10 @@ class DownloadRecentAdapter(private val onItemClick: (AppInfo) -> Unit) :
          * @param app AppInfo数据对象
          */
         fun bind(app: AppInfo) {
-            // 根据绑定对象的具体类型进行相应的数据绑定
-            if (binding is ItemRecentAppBinding) {
-                // 竖屏模式下的数据绑定
-                binding.app = app
-            } else if (binding is ItemRecentAppLandBinding) {
-                // 横屏模式下的数据绑定
-                binding.app = app
+            when (binding) {
+                is ItemRecentAppBinding -> binding.app = app
+                is ItemRecentAppLandBinding -> binding.app = app
             }
-            // 执行待处理的数据绑定操作
             binding.executePendingBindings()
         }
     }

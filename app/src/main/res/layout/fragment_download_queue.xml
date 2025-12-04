@@ -12,7 +12,11 @@
         <variable
             name="viewModel"
             type="com.example.storechat.ui.download.DownloadQueueViewModel" />
+<!--        <variable-->
+<!--            name="downloadAdapter"-->
+<!--            type="com.example.storechat.ui.download.DownloadQueueAdapter" />-->
     </data>
+
 
     <!-- 根布局，使用LinearLayout垂直排列 -->
     <LinearLayout
@@ -50,6 +54,20 @@
                 app:layout_constraintTop_toTopOf="parent"
                 android:contentDescription="TODO" />
         </androidx.constraintlayout.widget.ConstraintLayout>
+
+
+<!--        <androidx.recyclerview.widget.RecyclerView-->
+<!--            android:id="@+id/recyclerDownloads"-->
+<!--            android:layout_width="match_parent"-->
+<!--            android:layout_height="wrap_content"-->
+<!--            android:layout_marginTop="12dp"-->
+<!--            android:adapter="@{downloadAdapter}"-->
+<!--            android:nestedScrollingEnabled="false"-->
+<!--            app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"-->
+<!--            tools:listitem="@layout/item_download_task_land"-->
+<!--            tools:itemCount="2"/>-->
+
+
 
         <!-- 2. 正在下载的任务区域 -->
         <androidx.constraintlayout.widget.ConstraintLayout

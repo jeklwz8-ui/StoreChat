@@ -122,6 +122,7 @@
                     android:id="@+id/recyclerAppList"
                     android:layout_width="0dp"
                     android:layout_height="0dp"
+                    android:background="@android:color/white"
                     android:clipToPadding="false"
                     android:paddingStart="@dimen/common_half_margin"
                     android:paddingEnd="@dimen/common_half_margin"

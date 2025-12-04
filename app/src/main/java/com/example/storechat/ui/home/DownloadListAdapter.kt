@@ -47,9 +47,9 @@ class DownloadListAdapter(
             }
         }
 
-        fun bind(download: DownloadTask) {
-            currentTask = download
-            binding.download = download
+        fun bind(task: DownloadTask) {
+            currentTask = task
+            binding.task = task
             binding.executePendingBindings()
         }
     }

@@ -37,7 +37,7 @@
             app:layout_constraintStart_toEndOf="@id/ivAppIcon"
             app:layout_constraintTop_toTopOf="@id/ivAppIcon"
             app:layout_constraintEnd_toStartOf="@id/tvStatus"
-            tools:text="应用名称 (16.3%)" />
+            tools:text="应用名称" />
 
         <TextView
             android:id="@+id/tvSpeed"
@@ -72,13 +72,13 @@
             android:textColor="@color/text_secondary"
             android:textSize="11sp"
             app:layout_constraintBottom_toBottomOf="@id/progressBar"
-            app:layout_constraintEnd_toStartOf="@id/ivCancel"
+            app:layout_constraintEnd_toStartOf="@id/ivCancelDownload"
             app:layout_constraintTop_toTopOf="@id/progressBar"
             app:layout_constraintVertical_bias="0.0"
             tools:text="1.8MB/83.00MB" />
 
         <ImageView
-            android:id="@+id/ivCancel"
+            android:id="@+id/ivCancelDownload"
             android:layout_width="16dp"
             android:layout_height="16dp"
             android:layout_marginEnd="8dp"

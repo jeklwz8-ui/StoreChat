@@ -10,6 +10,7 @@ enum class DownloadStatus {
 }
 
 data class DownloadTask(
+    val id: Long,               // 新增ID，用于列表更新
     val app: AppInfo,
     val speed: String,          // 当前速度，如 "1.8MB/s"
     val downloadedSize: String, // 已下大小，如 "1.8MB"
@@ -20,7 +21,7 @@ data class DownloadTask(
 
     val statusButtonText: String
         get() = when (status) {
-            DownloadStatus.NONE -> "安装" // 新增
+            DownloadStatus.NONE -> "安装"
             DownloadStatus.DOWNLOADING -> "暂停"
             DownloadStatus.PAUSED -> "继续"
             DownloadStatus.VERIFYING -> "验证中"

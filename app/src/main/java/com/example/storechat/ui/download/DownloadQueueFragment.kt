@@ -71,6 +71,8 @@ class DownloadQueueFragment : Fragment() {
             activity?.findViewById<DrawerLayout>(R.id.drawerLayout)?.closeDrawer(GravityCompat.END)
         }
         binding.tvStatus.setOnClickListener { viewModel.onStatusClick() }
+        // 取消下载关闭弹窗任务
+        binding.ivCancelDownload.setOnClickListener { viewModel.cancelDownload() }
     }
 
     /**
