@@ -26,30 +26,6 @@ class DownloadQueueViewModel : ViewModel() {
         }
     }
 
-    val downloadingTitleText: LiveData<String> = activeTask.map {
-        if (it != null) "应用名称(1)" else "应用名称(0)"
-    }
-
-    val progressText: LiveData<String> = activeTask.map {
-        it?.let { task -> String.format("%.1f%%", task.progress * 1.0) } ?: "0.0%"
-    }
-
-    val sizeInfoText: LiveData<String> = activeTask.map {
-        it?.let { task -> "${task.downloadedSize}/${task.totalSize}" } ?: "0MB/0MB"
-    }
-
-    val appName: LiveData<String> = activeTask.map {
-        it?.app?.name ?: ""
-    }
-
-    val speedText: LiveData<String> = activeTask.map {
-        it?.speed ?: "0 KB/s"
-    }
-
-    val progressValue: LiveData<Int> = activeTask.map {
-        it?.progress ?: 0
-    }
-
     fun onStatusClick() {
         activeTask.value?.let { AppRepository.toggleDownload(it.app) }
     }

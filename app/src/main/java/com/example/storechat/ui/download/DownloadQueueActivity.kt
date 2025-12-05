@@ -2,7 +2,6 @@ package com.example.storechat.ui.download
 
 import android.content.Context
 import android.content.Intent
-import android.content.res.Configuration
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.viewModels
@@ -36,39 +35,28 @@ class DownloadQueueActivity : AppCompatActivity() {
     }
 
     private fun setupRecyclerView() {
+        // This adapter is for the portrait layout's download list
+        downloadAdapter = DownloadQueueAdapter(viewModel)
+        binding.adapter = downloadAdapter // Used by data binding in activity_download_queue.xml
+
+        // This adapter is for the recent apps list in both layouts (if the view exists)
         recentAdapter = DownloadRecentAdapter { app ->
             AppDetailActivity.start(this, app)
         }
 
-        if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
-            binding.recyclerRecent?.apply {
-                adapter = recentAdapter
-                layoutManager = LinearLayoutManager(this@DownloadQueueActivity, LinearLayoutManager.VERTICAL, false)
-            }
-        } else {
-            // For Portrait mode
-            downloadAdapter = DownloadQueueAdapter(viewModel)
-            binding.adapter = downloadAdapter
+        binding.recyclerDownloads?.layoutManager = LinearLayoutManager(this@DownloadQueueActivity)
 
-            binding.recyclerDownloads?.layoutManager = LinearLayoutManager(this@DownloadQueueActivity)
-
-            binding.recyclerRecent?.apply {
-                adapter = recentAdapter
-                layoutManager = GridLayoutManager(this@DownloadQueueActivity, 4)
-            }
+        binding.recyclerRecent?.apply {
+            adapter = recentAdapter
+            layoutManager = GridLayoutManager(this@DownloadQueueActivity, 4)
         }
     }
 
     private fun setupClickListeners() {
+        // These views are in activity_download_queue.xml and are safe to reference
         binding.ivBack?.setOnClickListener { finish() }
         binding.ivSearch?.setOnClickListener { SearchActivity.start(this) }
         binding.btnBackHome?.setOnClickListener { finish() }
-
-        if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
-            binding.tvStatus?.setOnClickListener { viewModel.onStatusClick() }
-            binding.tvAllResume?.setOnClickListener { viewModel.resumeAllPausedTasks() }
-            binding.ivCancel?.setOnClickListener { viewModel.cancelDownload() }
-        }
     }
 
     private fun observeViewModel() {
@@ -84,30 +72,16 @@ class DownloadQueueActivity : AppCompatActivity() {
             updateEmptyViewVisibility()
         }
 
-        if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
-            viewModel.activeTask.observe(this) { task ->
-                updateEmptyViewVisibility()
-            }
-        } else {
-            // For Portrait mode
-            viewModel.downloadTasks.observe(this) { tasks ->
-                downloadAdapter.submitList(tasks)
-                updateEmptyViewVisibility()
-            }
+        viewModel.downloadTasks.observe(this) { tasks ->
+            downloadAdapter.submitList(tasks)
+            updateEmptyViewVisibility()
         }
     }
 
     private fun updateEmptyViewVisibility() {
-        val isPortrait = resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
         val isDownloadListEmpty = viewModel.downloadTasks.value.isNullOrEmpty()
         val isRecentListEmpty = viewModel.recentInstalled.value.isNullOrEmpty()
-
-        if (isPortrait) {
-            binding.layoutEmpty?.isVisible = isDownloadListEmpty && isRecentListEmpty
-        } else {
-            val isLandscapeTaskEmpty = viewModel.activeTask.value == null
-            binding.layoutEmpty?.isVisible = isLandscapeTaskEmpty && isRecentListEmpty
-        }
+        binding.layoutEmpty?.isVisible = isDownloadListEmpty && isRecentListEmpty
     }
 
     companion object {
