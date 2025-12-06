@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- 背景（透明，只用外层 FrameLayout 的白底+边框） -->
+    <item android:id="@android:id/background">
+        <shape>
+            <solid android:color="@android:color/transparent" />
+            <corners android:radius="16dp" />
+        </shape>
+    </item>
+
+    <!-- 进度部分：浅蓝色，从左往右裁剪 -->
+    <item android:id="@android:id/progress">
+        <clip android:gravity="left">
+            <shape>
+                <!-- 这里用带透明度的蓝色，看起来更接近设计图的浅蓝 -->
+                <solid android:color="#332F7BFF" />
+                <corners android:radius="16dp" />
+            </shape>
+        </clip>
+    </item>
+
+</layer-list>

@@ -18,8 +18,9 @@ import com.example.storechat.model.AppInfo
 import com.example.storechat.ui.download.DownloadQueueActivity
 import com.example.storechat.ui.search.SearchActivity
 import com.google.android.material.tabs.TabLayoutMediator
+import me.jessyan.autosize.internal.CustomAdapt
 
-class AppDetailActivity : AppCompatActivity() {
+class AppDetailActivity : AppCompatActivity() , CustomAdapt {
 
     private lateinit var binding: ActivityAppDetailBinding
     private val viewModel: AppDetailViewModel by viewModels()
@@ -94,6 +95,17 @@ class AppDetailActivity : AppCompatActivity() {
             val intent = Intent(context, AppDetailActivity::class.java)
             intent.putExtra(EXTRA_PACKAGE_NAME, app.packageName)
             context.startActivity(intent)
+        }
+    }
+    override fun isBaseOnWidth(): Boolean {
+        return resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
+    }
+
+    override fun getSizeInDp(): Float {
+        return if (isBaseOnWidth()) {
+            411f
+        } else {
+            731f
         }
     }
 }

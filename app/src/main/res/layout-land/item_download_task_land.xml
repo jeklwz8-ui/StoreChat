@@ -36,7 +36,7 @@
             android:ellipsize="end"
             app:layout_constraintStart_toEndOf="@id/ivAppIcon"
             app:layout_constraintTop_toTopOf="@id/ivAppIcon"
-            app:layout_constraintEnd_toStartOf="@id/tvStatus"
+            app:layout_constraintEnd_toStartOf="@id/layoutStatus"
             tools:text="应用名称" />
 
         <TextView
@@ -58,6 +58,7 @@
             android:layout_marginTop="4dp"
             android:layout_marginEnd="8dp"
             android:progress="@{task.progress}"
+            android:max="100"
             android:progressDrawable="@drawable/bg_btn_progress_bar"
             app:layout_constraintTop_toBottomOf="@id/tvSpeed"
             app:layout_constraintStart_toStartOf="@id/tvAppName"
@@ -85,23 +86,41 @@
             android:src="@android:drawable/ic_menu_close_clear_cancel"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@id/tvStatus" />
+            app:layout_constraintEnd_toStartOf="@id/layoutStatus" />
 
-
-        <TextView
-            android:id="@+id/tvStatus"
-            android:layout_width="64dp"
-            android:layout_height="30dp"
+        <!-- 横屏用的同款胶囊按钮 -->
+        <FrameLayout
+            android:id="@+id/layoutStatus"
+            android:layout_width="72dp"
+            android:layout_height="32dp"
             android:layout_marginStart="8dp"
-            android:background="@drawable/bg_btn_progress"
-            android:gravity="center"
-            android:text="@{task.rightText}"
-            android:textColor="@color/blue_action"
-            android:textSize="12sp"
+            android:background="@drawable/bg_download_status_capsule"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintBottom_toBottomOf="parent"
-            tools:text="16.3%" />
+            app:layout_constraintBottom_toBottomOf="parent">
+
+            <ProgressBar
+                android:id="@+id/statusProgress"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:max="100"
+                android:progress="@{task.progress}"
+                android:indeterminate="false"
+                android:background="@android:color/transparent"
+                android:progressDrawable="@drawable/bg_download_status_progress"
+                tools:progress="50" />
+
+            <TextView
+                android:id="@+id/tvStatus"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:text="@{task.rightText}"
+                android:textColor="@color/sky_blue"
+                android:textSize="12sp"
+                tools:text="16.3%" />
+        </FrameLayout>
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 </layout>

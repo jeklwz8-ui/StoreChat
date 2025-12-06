@@ -94,12 +94,16 @@ data class AppInfo(
     /**
      * 用于显示进度的文本。
      */
+    /**
+     * 用于显示进度的文本。
+     */
     val progressText: String
         get() = when (downloadStatus) {
             DownloadStatus.DOWNLOADING -> "$progress%"
-            DownloadStatus.PAUSED -> "已暂停"
-            DownloadStatus.VERIFYING -> "验证中..."
-            DownloadStatus.INSTALLING -> "安装中..."
-            DownloadStatus.NONE -> ""
+            DownloadStatus.PAUSED      -> "继续"
+            DownloadStatus.VERIFYING   -> "验证中"
+            DownloadStatus.INSTALLING  -> "安装中"    // 去掉省略号
+            DownloadStatus.NONE        -> ""
         }
+
 }

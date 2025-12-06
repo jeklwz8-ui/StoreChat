@@ -1,11 +1,15 @@
 package com.example.storechat.ui.home
 
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import com.example.storechat.R
 import com.example.storechat.databinding.ItemDownloadTaskBinding
+import com.example.storechat.model.DownloadStatus
 import com.example.storechat.model.DownloadTask
 
 class DownloadListAdapter(
@@ -43,19 +47,37 @@ class DownloadListAdapter(
         private var currentTask: DownloadTask? = null
 
         init {
-            // ✅ 只通过按钮控制，不再点整行
+            // 点击按钮 暂停/继续
             binding.tvStatus.setOnClickListener {
-                currentTask?.let { onStatusClick(it) }
+                currentTask?.let(onStatusClick)
             }
-            // ✅ 这里是关闭 / 取消下载的小叉号（item_download_task.xml 里的 ivCancel）
+            // 取消下载
             binding.ivCancel.setOnClickListener {
-                currentTask?.let { onCancelClick(it) }
+                currentTask?.let(onCancelClick)
             }
         }
 
         fun bind(task: DownloadTask) {
             currentTask = task
             binding.task = task
+
+            val ctx = binding.root.context
+            val drawableRes = when (task.status) {
+                DownloadStatus.PAUSED -> R.drawable.bg_download_status_progress_paused
+                DownloadStatus.DOWNLOADING -> R.drawable.bg_download_status_progress
+                else -> R.drawable.bg_download_status_progress
+            }
+
+            binding.statusProgress.progress = task.progress
+            binding.statusProgress.progressDrawable =
+                ContextCompat.getDrawable(ctx, drawableRes)
+
+            binding.statusProgress.visibility = when (task.status) {
+                DownloadStatus.DOWNLOADING,
+                DownloadStatus.PAUSED -> View.VISIBLE
+                else -> View.INVISIBLE
+            }
+
             binding.executePendingBindings()
         }
     }

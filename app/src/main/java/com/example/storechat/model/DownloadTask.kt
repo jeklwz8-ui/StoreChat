@@ -15,7 +15,7 @@ data class DownloadTask(
     val speed: String,          // 当前速度，如 "1.8MB/s"
     val downloadedSize: String, // 已下大小，如 "1.8MB"
     val totalSize: String,      // 总大小，如 "83.00MB"
-    val progress: Int,          // 进度百分比
+    val progress: Int,          // 进度百分比 0~100
     val status: DownloadStatus
 ) {
 
@@ -32,14 +32,16 @@ data class DownloadTask(
     val rightText: String
         get() = when (status) {
             DownloadStatus.NONE -> ""
-            DownloadStatus.DOWNLOADING -> progressText
-            DownloadStatus.PAUSED -> "继续"
-            DownloadStatus.VERIFYING -> "验证中"
-            DownloadStatus.INSTALLING -> "安装中"
+            DownloadStatus.DOWNLOADING -> progressText    // 下载中：显示百分比
+            DownloadStatus.PAUSED -> "继续"               // 暂停：显示“继续”
+            DownloadStatus.VERIFYING -> "验证中"          // 验证中
+            DownloadStatus.INSTALLING -> "安装中"          // 安装中
         }
 
     val statusButtonEnabled: Boolean
-        get() = status == DownloadStatus.DOWNLOADING || status == DownloadStatus.PAUSED || status == DownloadStatus.NONE
+        get() = status == DownloadStatus.DOWNLOADING ||
+                status == DownloadStatus.PAUSED ||
+                status == DownloadStatus.NONE
 
     val progressText: String
         get() = "$progress%"

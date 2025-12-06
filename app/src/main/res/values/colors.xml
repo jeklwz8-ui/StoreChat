@@ -15,6 +15,7 @@
     <color name="btn_disabled_border">#CCCCCC</color>
     <color name="btn_disabled_text">#BBBBBB</color>
 
+    <color name="blue_action_light">#E3F2FF</color>
 
     <!-- 红色系 -->
     <color name="crimson">#DC143C</color>      <!-- 深红 -->
