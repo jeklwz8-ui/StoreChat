@@ -84,13 +84,6 @@ class HomeFragment : Fragment() {
             }
         }
 
-        // 添加点击输入框时恢复焦点，显示光标
-        binding.etSearch?.setOnClickListener {
-            binding.etSearch?.requestFocus()
-        }
-
-
-
         // 下载按钮点击：清红点 + 跳转下载页 / 抽屉
         val openDownloadPage: () -> Unit = {
             viewModel.onDownloadIconClicked()
@@ -111,33 +104,16 @@ class HomeFragment : Fragment() {
      *  - 横屏：在首页内联模糊查询（只刷新下方列表，不跳转）
      *  - 竖屏：保持原行为，跳转 SearchActivity
      */
-//    private fun performSearch() {
-//        val keyword = binding.etSearch?.text?.toString().orEmpty()
-//
-//        if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
-//            // 横屏：首页完成搜索
-//            viewModel.inlineSearch(keyword)
-//        } else {
-//            // 竖屏：维持原逻辑
-//            SearchActivity.start(requireContext(), keyword)
-//        }
-//    }
-
-
-
     private fun performSearch() {
-        val keyword = binding.etSearch?.text.toString().orEmpty()
+        val keyword = binding.etSearch?.text?.toString().orEmpty()
 
-        if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE){
-//            横屏：直接在首页内联搜索
+        if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+            // 横屏：首页完成搜索
             viewModel.inlineSearch(keyword)
-            // 清除 EditText 焦点，隐藏光标
-            binding.etSearch?.clearFocus()
-        }else{
-//            竖屏：跳转到 SearchActivity
+        } else {
+            // 竖屏：维持原逻辑
             SearchActivity.start(requireContext(), keyword)
         }
-
     }
 
     private fun observeViewModel() {
@@ -174,34 +150,31 @@ class HomeFragment : Fragment() {
 
         // ======= 下载图标 / 进度圈 / 红点联动 =======
 
-        // 是否有下载任务：决定进度圈是否显示
+        // 1）是否有下载任务：只负责控制“进度圈”是否显示，不再动红点
         viewModel.isDownloadInProgress.observe(viewLifecycleOwner) { inProgress ->
             val progressCircle = binding.cpiDownloadProgress
             val downloadIcon = binding.ivDownloadManager
-            val redDot = binding.viewDownloadDot
 
             if (inProgress == true) {
                 progressCircle?.visibility = View.VISIBLE
                 downloadIcon?.visibility = View.VISIBLE
-                redDot?.visibility = View.GONE
             } else {
                 progressCircle?.visibility = View.GONE
                 downloadIcon?.visibility = View.VISIBLE
-                // 红点显示交给 downloadFinishedDotVisible
             }
         }
 
-        // 总进度：驱动圆形进度圈，让圆环慢慢包围图标
+        // 2）总进度：驱动圆形进度圈，让圆环慢慢包围图标
         viewModel.totalDownloadProgress.observe(viewLifecycleOwner) { progress ->
             val value = (progress ?: 0).coerceIn(0, 100)
+            // 这里用的是 Material 的 CircularProgressIndicator
             binding.cpiDownloadProgress?.setProgressCompat(value, true)
         }
 
-        // 下载完成红点：仅在没有下载进行时显示
+        // 3）下载完成红点：只看 downloadFinishedDotVisible
         viewModel.downloadFinishedDotVisible.observe(viewLifecycleOwner) { visible ->
             val redDot = binding.viewDownloadDot
-            val inProgress = viewModel.isDownloadInProgress.value == true
-            redDot?.visibility = if (!inProgress && visible == true) {
+            redDot?.visibility = if (visible == true) {
                 View.VISIBLE
             } else {
                 View.GONE

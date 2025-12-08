@@ -43,12 +43,16 @@ class HomeViewModel : ViewModel() {
     val isDownloadInProgress: LiveData<Boolean> =
         downloadQueue.map { list -> !list.isNullOrEmpty() }
 
-    /** 所有下载任务的平均进度（0~100）：驱动右上角进度圈 */
+    /**
+     * 总进度的小进度条：
+     *  进度 = 下载队列所有任务 progress 字段的“平均值”（0~100）
+     */
     val totalDownloadProgress: LiveData<Int> =
         downloadQueue.map { list ->
             if (list.isNullOrEmpty()) {
                 0
             } else {
+                // 所有任务的进度求平均
                 val sum = list.sumOf { it.progress.coerceIn(0, 100) }
                 sum / list.size
             }
@@ -59,25 +63,25 @@ class HomeViewModel : ViewModel() {
 
     /**
      * 是否显示“下载完成”红点：
-     * 1. 有最近安装记录
-     * 2. 当前没有下载在进行
-     * 3. 用户没有手动清除
+     *  ✅ 只要有一个任务下载完成（recentInstalled 非空）就亮红点
+     *  ❌ 用户点过一次图标后关闭红点，下次有新的完成任务再亮
+     *  （不再跟是否仍有下载进行中挂钩）
      */
     val downloadFinishedDotVisible: LiveData<Boolean> =
         object : MediatorLiveData<Boolean>() {
             init {
                 fun update() {
                     val hasRecent = recentInstalled.value?.isNotEmpty() == true
-                    val inProgress = isDownloadInProgress.value == true
                     val cleared = _downloadDotClearedManually.value == true
-                    value = hasRecent && !inProgress && !cleared
+                    value = hasRecent && !cleared
                 }
 
+                // 有新的安装完成：允许红点重新出现
                 addSource(recentInstalled) {
-                    // 有新的安装完成时，允许再次显示红点
                     _downloadDotClearedManually.value = false
                     update()
                 }
+                // 下载状态变化时也触发一次刷新（虽然不参与判断）
                 addSource(isDownloadInProgress) { update() }
                 addSource(_downloadDotClearedManually) { update() }
             }
