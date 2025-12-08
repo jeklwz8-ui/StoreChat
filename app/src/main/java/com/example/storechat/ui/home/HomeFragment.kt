@@ -83,6 +83,10 @@ class HomeFragment : Fragment() {
                 false
             }
         }
+        // 添加点击输入框时恢复焦点，显示光标
+        binding.etSearch?.setOnClickListener {
+            binding.etSearch?.requestFocus()
+        }
 
         // 下载按钮点击：清红点 + 跳转下载页 / 抽屉
         val openDownloadPage: () -> Unit = {
@@ -107,13 +111,16 @@ class HomeFragment : Fragment() {
     private fun performSearch() {
         val keyword = binding.etSearch?.text?.toString().orEmpty()
 
-        if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
-            // 横屏：首页完成搜索
+        if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE){
+//            横屏：直接在首页内联搜索
             viewModel.inlineSearch(keyword)
-        } else {
-            // 竖屏：维持原逻辑
+            // 清除 EditText 焦点，隐藏光标
+            binding.etSearch?.clearFocus()
+        }else{
+//            竖屏：跳转到 SearchActivity
             SearchActivity.start(requireContext(), keyword)
         }
+
     }
 
     private fun observeViewModel() {

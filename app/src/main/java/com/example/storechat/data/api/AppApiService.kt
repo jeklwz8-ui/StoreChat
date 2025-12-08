@@ -2,7 +2,9 @@ package com.example.storechat.data.api
 
 import com.example.storechat.model.AppInfo
 import com.example.storechat.model.VersionInfo
+import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.POST
 import retrofit2.http.Query
 
 
@@ -17,9 +19,52 @@ data class DownloadLinkResponse(
     val expireTime: Long? = null  // 过期时间（时间戳，可选）
 )
 
+// 业务层真正要传的“data”内容（拦截器会把它包起来）
+data class AppListRequest(val category: String)
+
+data class AppHistoryRequest(val packageName: String)
+
+data class CheckUpdateRequest(
+    val packageName: String,
+    val currentVer: String
+)
+
+data class DownloadLinkRequest(
+    val packageName: String,
+    val versionName: String? = null
+)
+
+
+
 interface AppApiService {
 
-    // a. 应用列表接口：支持按分类查询
+    // a. 应用列表接口
+    @POST("api/apps")
+    suspend fun getAppList(
+        @Body body: AppListRequest
+    ): List<AppInfo>
+
+    // c. 应用历史版本列表接口
+    @POST("api/app/history")
+    suspend fun getAppHistory(
+        @Body body: AppHistoryRequest
+    ): List<VersionInfo>
+
+    // 检查更新
+    @POST("api/app/check_update")
+    suspend fun checkUpdate(
+        @Body body: CheckUpdateRequest
+    ): VersionInfo?
+
+    // b. 下载链接获取接口
+    @POST("api/app/download_link")
+    suspend fun getDownloadLink(
+        @Body body: DownloadLinkRequest
+    ): DownloadLinkResponse
+}
+
+
+ /**   // a. 应用列表接口：支持按分类查询
     // 示例：/api/apps?category=1
     @GET("api/apps")
     suspend fun getAppList(
@@ -68,3 +113,4 @@ interface AppApiService {
 //    @GET("api/app/check_update")
 //    suspend fun checkUpdate(@Query("packageName") packageName: String, @Query("currentVer") version: String): VersionInfo?
 //}
+**/

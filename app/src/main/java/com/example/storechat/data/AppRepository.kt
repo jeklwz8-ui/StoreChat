@@ -4,6 +4,9 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MediatorLiveData
 import androidx.lifecycle.MutableLiveData
 import com.example.storechat.data.api.ApiClient
+import com.example.storechat.data.api.AppHistoryRequest
+import com.example.storechat.data.api.AppListRequest
+import com.example.storechat.data.api.DownloadLinkRequest
 import com.example.storechat.model.AppCategory
 import com.example.storechat.model.AppInfo
 import com.example.storechat.model.DownloadStatus
@@ -177,7 +180,10 @@ object AppRepository {
                 AppCategory.ICBC -> "2"
                 AppCategory.CCB -> "3"
             }
-            val remoteList = apiService.getAppList(categoryParam)
+//            val remoteList = apiService.getAppList(categoryParam)
+            val remoteList = apiService.getAppList(
+                AppListRequest(category = categoryParam)
+            )
 
             synchronized(stateLock) {
                 // 保留其他分类的本地数据，替换当前分类的数据
@@ -196,10 +202,20 @@ object AppRepository {
         versionName: String?
     ): String {
         return try {
+
             val resp = apiService.getDownloadLink(
-                packageName = packageName,
-                versionName = versionName
+                DownloadLinkRequest(
+                    packageName = packageName,
+                    versionName = versionName
+                )
             )
+
+
+
+//            val resp = apiService.getDownloadLink(
+//                packageName = packageName,
+//                versionName = versionName
+//            )
             if (resp.url.isBlank()) fallbackApkPath else resp.url
         } catch (e: Exception) {
             fallbackApkPath
@@ -322,7 +338,14 @@ object AppRepository {
 
     suspend fun loadHistoryVersions(app: AppInfo): List<HistoryVersion> {
         return try {
-            val versions = apiService.getAppHistory(app.packageName)
+//            val versions = apiService.getAppHistory(app.packageName)
+
+            val versions = apiService.getAppHistory(
+                AppHistoryRequest (packageName = app.packageName)
+            )
+
+
+
             if (versions.isNotEmpty()) {
                 versions.map {
                     HistoryVersion(
