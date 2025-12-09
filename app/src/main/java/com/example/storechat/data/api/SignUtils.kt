@@ -69,4 +69,35 @@ object SignUtils {
         val bytes = mac.doFinal(data.toByteArray(Charsets.UTF_8))
         return bytes.joinToString("") { "%02x".format(it) }
     }
+
+    fun testSign(): String {
+        val appId = "testAppId"
+        val appSecret = "testSecret123"
+        val deviceId = "device123"
+        val timestamp = 1700000000L
+        val nonce = "abc123xyz"
+
+        // 原始业务 JSON 字符串
+        val bizJsonString = """{"category":"1"}"""
+
+        // 如果你写了 canonicalJson，就用它；没有就直接用上面这个字符串
+        val canonicalData = canonicalJson(bizJsonString)
+
+        val signString = "appId=$appId" +
+                "&appSecret=$appSecret" +
+                "&data=$canonicalData" +
+                "&deviceId=$deviceId" +
+                "&nonce=$nonce" +
+                "&timestamp=$timestamp"
+
+        val sign = hmacSha256Hex(signString, appSecret)
+
+        android.util.Log.d("SignTest", "signString = $signString")
+        android.util.Log.d("SignTest", "sign       = $sign")
+
+        return sign
+    }
+
+
+
 }

@@ -2,9 +2,11 @@ package com.example.storechat
 
 import android.content.res.Configuration
 import android.os.Bundle
+import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
+import com.example.storechat.data.api.SignUtils
 import com.example.storechat.ui.home.HomeFragment
 import com.example.storechat.xc.XcServiceManager
 import me.jessyan.autosize.internal.CustomAdapt
@@ -16,6 +18,10 @@ class MainActivity : AppCompatActivity() , CustomAdapt{  //  实现 CustomAdapt
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+
+        val sign = SignUtils.testSign()
+        Log.d("SignTest", "result = $sign")
 
         // Initialize XC Service Manager
         XcServiceManager.init(this)

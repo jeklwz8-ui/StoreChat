@@ -33,13 +33,13 @@ class SignInterceptor : Interceptor {
         // 3. 生成签名所需参数
         val timestamp = SignUtils.generateTimestampSeconds()
         val nonce = SignUtils.generateNonce()
-        val deviceNo = SignConfig.getDeviceNo()
+        val deviceId = SignConfig.getDeviceId()
 
         // 4. 按文档顺序拼接 signString
         val signString = "appId=${SignConfig.APP_ID}" +
                 "&appSecret=${SignConfig.APP_SECRET}" +
                 "&data=$canonicalData" +
-                "&deviceNo=$deviceNo" +
+                "&deviceId=$deviceId" +
                 "&nonce=$nonce" +
                 "&timestamp=$timestamp"
 
@@ -49,7 +49,7 @@ class SignInterceptor : Interceptor {
         // 6. 构造最终请求体 JSON
         val finalJson = JSONObject().apply {
             put("appId", SignConfig.APP_ID)
-            put("deviceNo", deviceNo)
+            put("deviceId", deviceId)
             put("timestamp", timestamp)
             put("nonce", nonce)
             put("data", canonicalData) // 注意：这里是字符串

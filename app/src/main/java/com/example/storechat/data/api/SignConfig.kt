@@ -6,7 +6,7 @@ object SignConfig {
     const val APP_SECRET = "你的appSecret"
 
     // 简单写法：先写死一个设备号，后面你可以自己换成 ANDROID_ID / SN 等
-    fun getDeviceNo(): String {
+    fun getDeviceId(): String {
         return "demo-device-no" // TODO: 换成真实设备号
     }
 }
