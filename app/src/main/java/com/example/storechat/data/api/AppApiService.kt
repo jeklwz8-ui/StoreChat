@@ -23,10 +23,10 @@ interface AppApiService {
         @Body body: CheckUpdateRequest
     ): VersionInfo?
 
-    @POST("app/download_link")
+    @POST("iotDeviceData/appVersionDownload")
     suspend fun getDownloadLink(
-        @Body body: DownloadLinkRequest
-    ): DownloadLinkResponse
+        @Body body: AppVersionDownloadRequest
+    ): AppVersionDownloadResponse
 
     @POST("iotDeviceData/getDeviceMQTTInfo")
     suspend fun getMqttInfo(
@@ -34,21 +34,11 @@ interface AppApiService {
     ): ApiWrapper<MqttInfo>
 }
 
-data class DownloadLinkResponse(
-    val url: String,
-    val expireTime: Long? = null
-)
-
 data class CheckUpdateRequest(
     @SerializedName("appId")
     val packageName: String,
     @SerializedName("version")
     val currentVer: String
-)
-
-data class DownloadLinkRequest(
-    val packageName: String,
-    val versionName: String? = null
 )
 
 data class MqttInitBizBody(

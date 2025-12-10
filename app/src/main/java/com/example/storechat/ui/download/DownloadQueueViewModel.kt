@@ -11,17 +11,16 @@ import com.example.storechat.model.DownloadStatus
 
 class DownloadQueueViewModel : ViewModel() {
 
-
-
     // region Data for Landscape (Single Task) & backward compatibility
     val activeTask: LiveData<DownloadTask?> = AppRepository.downloadQueue.map { queue ->
         queue.firstOrNull()?.let {
+            val totalSizeMb = it.size.replace("MB", "").toFloatOrNull() ?: 0f
             DownloadTask(
                 id = 0, // Static ID for the single view
                 app = it,
                 progress = it.progress,
                 speed = "", // This should be calculated based on download progress
-                downloadedSize = "${(it.size.replace("MB", "").toFloat() * it.progress / 100)}MB",
+                downloadedSize = "${(totalSizeMb * it.progress / 100)}MB",
                 totalSize = it.size,
                 status = it.downloadStatus
             )
@@ -44,12 +43,13 @@ class DownloadQueueViewModel : ViewModel() {
     // region Data for Portrait (Multi Task)
     val downloadTasks: LiveData<List<DownloadTask>> = AppRepository.downloadQueue.map { queue ->
         queue.mapIndexed { index, app ->
+            val totalSizeMb = app.size.replace("MB", "").toFloatOrNull() ?: 0f
             DownloadTask(
                 id = index.toLong(),
                 app = app,
                 progress = app.progress,
                 speed = "speed", // This should be calculated based on download progress
-                downloadedSize = "${(app.size.replace("MB", "").toFloat() * app.progress / 100)}MB",
+                downloadedSize = "${(totalSizeMb * app.progress / 100)}MB",
                 totalSize = app.size,
                 status = app.downloadStatus
             )
@@ -67,7 +67,6 @@ class DownloadQueueViewModel : ViewModel() {
     }
     // endregion
 
-    // region Common Data & Actions
     // region Common Data & Actions
     val recentInstalled: LiveData<List<AppInfo>> = AppRepository.recentInstalledApps
 

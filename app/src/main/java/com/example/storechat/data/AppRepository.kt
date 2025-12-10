@@ -7,7 +7,7 @@ import com.example.storechat.data.api.ApiClient
 import com.example.storechat.data.api.AppVersionHistoryRequest
 import com.example.storechat.data.api.AppListRequest
 import com.example.storechat.data.api.CheckUpdateRequest
-import com.example.storechat.data.api.DownloadLinkRequest
+import com.example.storechat.data.api.AppVersionDownloadRequest
 import com.example.storechat.model.AppCategory
 import com.example.storechat.model.AppInfo
 import com.example.storechat.model.DownloadStatus
@@ -172,18 +172,22 @@ object AppRepository {
     }
 
     private suspend fun resolveDownloadApkPath(
-        packageName: String,
-        fallbackApkPath: String,
-        versionName: String?
+        appId: String, 
+        versionName: String, 
+        fallbackApkPath: String
     ): String {
         return try {
-            val resp = apiService.getDownloadLink(
-                DownloadLinkRequest(
-                    packageName = packageName,
-                    versionName = versionName
+            val response = apiService.getDownloadLink(
+                AppVersionDownloadRequest(
+                    appId = appId,
+                    version = versionName
                 )
             )
-            if (resp.url.isBlank()) fallbackApkPath else resp.url
+            if (response.code == 200 && response.data != null && response.data.fileUrl.isNotBlank()) {
+                response.data.fileUrl
+            } else {
+                fallbackApkPath
+            }
         } catch (e: Exception) {
             fallbackApkPath
         }
@@ -205,9 +209,9 @@ object AppRepository {
                 val newJob = coroutineScope.launch(start = CoroutineStart.LAZY) {
                     try {
                         val realApkPath = resolveDownloadApkPath(
-                            packageName = app.packageName,
-                            fallbackApkPath = app.apkPath,
-                            versionName = app.versionName
+                            appId = app.appId,
+                            versionName = app.versionName,
+                            fallbackApkPath = app.apkPath
                         )
 
                         updateAppStatus(app.packageName) {
@@ -324,9 +328,9 @@ object AppRepository {
     fun installHistoryVersion(packageName: String, historyVersion: HistoryVersion) {
         coroutineScope.launch {
             val realApkPath = resolveDownloadApkPath(
-                packageName = packageName,
-                fallbackApkPath = historyVersion.apkPath,
-                versionName = historyVersion.versionName
+                appId = packageName, // Assuming packageName is used as appId here
+                versionName = historyVersion.versionName,
+                fallbackApkPath = historyVersion.apkPath
             )
             XcServiceManager.installApk(realApkPath, packageName, true)
         }
