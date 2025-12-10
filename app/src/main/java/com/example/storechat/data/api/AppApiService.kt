@@ -139,7 +139,7 @@ interface AppApiService {
      * @param body 应用列表请求参数
      * @return 应用信息列表
      */
-    @POST("api/apps")
+    @POST("apps")
     suspend fun getAppList(
         @Body body: AppListRequest
     ): List<AppInfo>
@@ -150,7 +150,7 @@ interface AppApiService {
      * @param body 应用历史版本请求参数
      * @return 版本信息列表
      */
-    @POST("api/app/history")
+    @POST("app/history")
     suspend fun getAppHistory(
         @Body body: AppHistoryRequest
     ): List<VersionInfo>
@@ -161,7 +161,7 @@ interface AppApiService {
      * @param body 更新检查请求参数
      * @return 版本信息（如果有更新的话）
      */
-    @POST("api/app/check_update")
+    @POST("app/check_update")
     suspend fun checkUpdate(
         @Body body: CheckUpdateRequest
     ): VersionInfo?
@@ -172,7 +172,7 @@ interface AppApiService {
      * @param body 下载链接请求参数
      * @return 下载链接响应信息
      */
-    @POST("api/app/download_link")
+    @POST("app/download_link")
     suspend fun getDownloadLink(
         @Body body: DownloadLinkRequest
     ): DownloadLinkResponse
@@ -183,7 +183,7 @@ interface AppApiService {
      * @param body MQTT初始化业务数据
      * @return 包含MQTT连接信息的API响应
      */
-    @POST("openapi/iotDeviceData/getDeviceMQTTInfo")
+    @POST("iotDeviceData/getDeviceMQTTInfo")
     suspend fun getMqttInfo(
         @Body body: MqttInitBizBody
     ): ApiWrapper<MqttInfo>

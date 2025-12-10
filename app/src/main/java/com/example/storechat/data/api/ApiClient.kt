@@ -18,7 +18,7 @@ object ApiClient {
      * API基础URL地址
      * 所有API端点都将基于此URL构建
      */
-    private const val BASE_URL = "https://test.yannuozhineng.com/acms/"
+    private const val BASE_URL = "https://test.yannuozhineng.com/acms/api/"
 
     /**
      * 日志拦截器懒加载属性

@@ -47,6 +47,14 @@ class HomeFragment : Fragment() {
         observeViewModel()
     }
 
+    override fun onResume() {
+        super.onResume()
+        // 竖屏模式下，从其他页面返回时，刷新列表以更新状态
+        if (resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT) {
+            refreshCurrentCategory()
+        }
+    }
+
     private fun setupViews() {
         appListAdapter = AppListAdapter(
             onItemClick = { app -> openDetail(app) },
@@ -70,7 +78,9 @@ class HomeFragment : Fragment() {
                 viewModel.selectCategory(category)
             }
             override fun onTabUnselected(tab: TabLayout.Tab) {}
-            override fun onTabReselected(tab: TabLayout.Tab) {}
+            override fun onTabReselected(tab: TabLayout.Tab) {
+                 refreshCurrentCategory()
+            }
         })
 
         // 搜索按钮 & 键盘搜索
@@ -186,6 +196,14 @@ class HomeFragment : Fragment() {
             } else {
                 View.GONE
             }
+        }
+    }
+    
+    private fun refreshCurrentCategory() {
+        val selectedTabPosition = binding.tabLayoutCategories.selectedTabPosition
+        if (selectedTabPosition != TabLayout.Tab.INVALID_POSITION) {
+            val category = AppCategory.values()[selectedTabPosition]
+            viewModel.selectCategory(category)
         }
     }
 

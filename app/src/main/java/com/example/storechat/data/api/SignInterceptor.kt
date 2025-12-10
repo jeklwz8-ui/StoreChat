@@ -19,11 +19,12 @@ class SignInterceptor : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val originalRequest = chain.request()
 
-        val body = originalRequest.body
+        val body: RequestBody? = originalRequest.body
         val contentType = body?.contentType()
-        val isJson = contentType != null &&
-                contentType.type == "application" &&
-                contentType.subtype == "json"
+        val isJson =
+            contentType != null &&
+                    contentType.type == "application" &&
+                    contentType.subtype == "json"
 
         // 只处理 POST + JSON
         if (originalRequest.method != "POST" || !isJson || body == null) {
@@ -31,20 +32,16 @@ class SignInterceptor : Interceptor {
         }
 
         // 1. 读出原始业务 JSON（接口真正的 body）
-        val buffer = okio.Buffer()
+        val buffer = Buffer()
         body.writeTo(buffer)
         val dataString = buffer.readUtf8()   // 注意：直接作为 data
-
-//        // ⚠️ 不再 canonicalJson，直接用原始字符串作为 data
-//        val dataString = bizJsonString
 
         // 2. 生成签名相关字段
         val timestamp = SignUtils.generateTimestampMillis()
         val nonce = SignUtils.generateNonce()
         val deviceId = SignConfig.getDeviceId()
 
-        // 3. 按照后端约定拼接 signString
-        //    这里顺序要跟文档一致，如果后端文档是别的顺序，请按文档改
+        // 3. 按照后端约定拼接 signString（你已经和后端对过）
         val signString = "appId=${SignConfig.APP_ID}" +
                 "&appSecret=${SignConfig.APP_SECRET}" +
                 "&data=$dataString" +
@@ -77,4 +74,3 @@ class SignInterceptor : Interceptor {
         return chain.proceed(newRequest)
     }
 }
-
