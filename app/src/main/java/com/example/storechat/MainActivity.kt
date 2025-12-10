@@ -22,7 +22,9 @@ import java.lang.Exception
 
 class MainActivity : AppCompatActivity(), CustomAdapt {  //  实现 CustomAdapt
 
-    //测试1
+    //测试3
+
+    // 测试4
     private var drawerLayout: DrawerLayout? = null
     private lateinit var mqttManager: MqttManager
     private lateinit var deviceId: String
