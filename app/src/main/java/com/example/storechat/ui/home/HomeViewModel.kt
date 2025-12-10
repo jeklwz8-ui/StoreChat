@@ -13,6 +13,8 @@ import com.example.storechat.model.UpdateStatus
 
 class HomeViewModel : ViewModel() {
 
+    val isLoading: LiveData<Boolean> = AppRepository.isLoading
+
     // --- 基础 UI 数据 --- //
     val appVersion: LiveData<String>
 

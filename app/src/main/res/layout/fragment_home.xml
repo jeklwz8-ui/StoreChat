@@ -1,14 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 应用主页 HomeFragment 的布局文件 -->
 <layout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools">
 
     <data>
-        <!-- 绑定的 ViewModel，用于提供数据和处理业务逻辑 -->
         <variable
             name="viewModel"
             type="com.example.storechat.ui.home.HomeViewModel" />
+        <import type="android.view.View" />
     </data>
 
     <androidx.constraintlayout.widget.ConstraintLayout
@@ -17,7 +16,6 @@
         android:background="@color/store_bg"
         tools:context=".ui.home.HomeFragment">
 
-        <!-- ★ 顶部搜索条 -->
         <FrameLayout
             android:id="@+id/cardSearch"
             android:layout_width="0dp"
@@ -29,12 +27,10 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent">
 
-            <!-- 使用 ConstraintLayout 布局搜索条内部元素 -->
             <androidx.constraintlayout.widget.ConstraintLayout
                 android:layout_width="match_parent"
                 android:layout_height="match_parent">
 
-                <!-- 左侧 Logo -->
                 <ImageView
                     android:id="@+id/ivLogo"
                     android:layout_width="23dp"
@@ -45,7 +41,6 @@
                     app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintStart_toStartOf="parent" />
 
-                <!-- 右侧下载区域：FrameLayout 叠加 进度圈 + 图标 + 红点 -->
                 <FrameLayout
                     android:id="@+id/layoutDownloadIcon"
                     android:layout_width="23dp"
@@ -54,7 +49,6 @@
                     app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintEnd_toEndOf="parent">
 
-                    <!-- 圆形进度圈：有下载任务时显示，用进度包围图标 -->
                     <com.google.android.material.progressindicator.CircularProgressIndicator
                         android:id="@+id/cpiDownloadProgress"
                         android:layout_width="match_parent"
@@ -66,7 +60,6 @@
                         app:indicatorInset="0dp"
                         android:visibility="gone" />
 
-                    <!-- 中间的下载图标（id 保持原样，用来点击跳转下载页） -->
                     <ImageView
                         android:id="@+id/ivDownloadManager"
                         android:layout_width="17dp"
@@ -75,7 +68,6 @@
                         android:src="@drawable/ic_download"
                         android:contentDescription="@null" />
 
-                    <!-- 下载完成提示小红点 -->
                     <View
                         android:id="@+id/viewDownloadDot"
                         android:layout_width="6dp"
@@ -85,7 +77,6 @@
                         android:visibility="gone" />
                 </FrameLayout>
 
-                <!-- 中间搜索块 -->
                 <ImageView
                     android:id="@+id/ivSearch"
                     android:layout_width="0dp"
@@ -103,7 +94,6 @@
             </androidx.constraintlayout.widget.ConstraintLayout>
         </FrameLayout>
 
-        <!-- ★ 中间内容卡片 -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/cardContent"
             android:layout_width="0dp"
@@ -125,7 +115,6 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent">
 
-                <!-- 分类标签栏 -->
                 <com.google.android.material.tabs.TabLayout
                     android:id="@+id/tabLayoutCategories"
                     android:layout_width="match_parent"
@@ -145,7 +134,6 @@
                     app:tabSelectedTextColor="@color/black"
                     app:tabTextColor="@color/text_secondary" />
 
-                <!-- 应用列表 -->
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/recyclerAppList"
                     android:layout_width="0dp"
@@ -162,12 +150,23 @@
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toBottomOf="@id/tabLayoutCategories"
                     app:layout_constraintVertical_bias="1.0"
-                    tools:listitem="@layout/item_app" />
+                    tools:listitem="@layout/item_app"
+                    android:visibility="@{viewModel.isLoading ? View.GONE : View.VISIBLE}" />
+
+                <ProgressBar
+                    android:id="@+id/progressBar"
+                    style="?android:attr/progressBarStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    android:visibility="@{viewModel.isLoading ? View.VISIBLE : View.GONE}" />
 
             </androidx.constraintlayout.widget.ConstraintLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- ★ 底部版本号 -->
         <TextView
             android:id="@+id/tvVersion"
             android:layout_width="wrap_content"

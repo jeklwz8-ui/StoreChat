@@ -28,6 +28,9 @@ object AppRepository {
 
     private val coroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
+    private val _isLoading = MutableLiveData(false)
+    val isLoading: LiveData<Boolean> = _isLoading
+
     private val downloadJobs = ConcurrentHashMap<String, Job>()
     private val cancellationsForDeletion = ConcurrentHashMap.newKeySet<String>()
 
@@ -121,6 +124,7 @@ object AppRepository {
     }
 
     private suspend fun refreshAppsFromServer(category: AppCategory) {
+        _isLoading.postValue(true)
         try {
             val response = apiService.getAppList(
                 AppListRequest(appId = null, appCategory = category.id)
@@ -162,6 +166,8 @@ object AppRepository {
         } catch (e: Exception) {
             // On network error or other issues, we keep the existing local data to be safe.
             e.printStackTrace()
+        } finally {
+            _isLoading.postValue(false)
         }
     }
 
