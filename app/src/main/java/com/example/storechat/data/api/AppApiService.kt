@@ -10,8 +10,8 @@ interface AppApiService {
 
     @POST("iotDeviceData/queryAppList")
     suspend fun getAppList(
-        @Body body: AppListRequest
-    ): AppListResponse
+        @Body body: AppListRequestBody
+    ): ApiWrapper<List<AppInfoResponse>>
 
     @POST("iotDeviceData/queryAppVersionList")
     suspend fun getAppHistory(
@@ -33,6 +33,31 @@ interface AppApiService {
         @Body body: MqttInitBizBody
     ): ApiWrapper<MqttInfo>
 }
+
+/**
+ * 应用列表接口的请求体
+ */
+data class AppListRequestBody(
+    val appId: String? = null,
+    val appCategory: Int? = null
+)
+
+/**
+ * 应用列表接口的响应数据项
+ */
+data class AppInfoResponse(
+    val productName: String,
+    val appId: String,
+    val appCategory: Int,
+    val id: Int?,
+    val version: String?,
+    val versionCode: String?,
+    val versionDesc: String?,
+    val status: Int?,
+    val createTime: String,
+    val updateTime: String?,
+    val remark: String?
+)
 
 data class DownloadLinkResponse(
     val url: String,

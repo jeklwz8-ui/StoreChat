@@ -4,8 +4,9 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MediatorLiveData
 import androidx.lifecycle.MutableLiveData
 import com.example.storechat.data.api.ApiClient
+import com.example.storechat.data.api.AppInfoResponse
+import com.example.storechat.data.api.AppListRequestBody
 import com.example.storechat.data.api.AppVersionHistoryRequest
-import com.example.storechat.data.api.AppListRequest
 import com.example.storechat.data.api.CheckUpdateRequest
 import com.example.storechat.data.api.DownloadLinkRequest
 import com.example.storechat.model.AppCategory
@@ -73,7 +74,6 @@ object AppRepository {
 
     private fun updateAppStatus(packageName: String, transform: (AppInfo) -> AppInfo) {
         synchronized(stateLock) {
-            // Use packageName (which is now appId) as the key
             val app = localAllApps.find { it.packageName == packageName } ?: return
             val newApp = transform(app)
 
@@ -120,38 +120,19 @@ object AppRepository {
         }
     }
 
-    private suspend fun refreshAppsFromServer(category: AppCategory) {
+    private suspend fun refreshAppsFromServer(category: AppCategory?) {
         try {
             val response = apiService.getAppList(
-                AppListRequest(appId = null, appCategory = category.id)
+                AppListRequestBody(appCategory = category?.id)
             )
 
-            if (response.code == 200) {
+            if (response.code == 200 && response.data != null) {
                 val remoteList = response.data
                 synchronized(stateLock) {
                     val localAppsMap = localAllApps.associateBy { it.appId }
 
                     val mergedRemoteList = remoteList.map { serverApp ->
-                        val localApp = localAppsMap[serverApp.appId]
-                        val newAppInfo = AppInfo(
-                                name = serverApp.productName,
-                                appId = serverApp.appId,
-                                category = AppCategory.from(serverApp.appCategory) ?: AppCategory.YANNUO,
-                                createTime = serverApp.createTime,
-                                updateTime = serverApp.updateTime,
-                                remark = serverApp.remark,
-                                description = serverApp.remark ?: "", // Use remark as description
-                                size = "N/A", // Placeholder
-                                downloadCount = 0, // Placeholder
-                                packageName = serverApp.appId, // Use appId as a temporary substitute for packageName
-                                apkPath = "", // Placeholder, critical for install
-                                installState = localApp?.installState ?: InstallState.NOT_INSTALLED,
-                                versionName = "1.0.0", // Placeholder
-                                releaseDate = serverApp.createTime, // Use createTime as releaseDate
-                                downloadStatus = localApp?.downloadStatus ?: DownloadStatus.NONE,
-                                progress = localApp?.progress ?: 0
-                        )
-                        newAppInfo
+                        mapToAppInfo(serverApp, localAppsMap[serverApp.appId])
                     }
 
                     val otherCategoryApps = localAllApps.filter { it.category != category }
@@ -160,9 +141,29 @@ object AppRepository {
                 }
             }
         } catch (e: Exception) {
-            // On network error or other issues, we keep the existing local data to be safe.
             e.printStackTrace()
         }
+    }
+
+    private fun mapToAppInfo(response: AppInfoResponse, localApp: AppInfo?): AppInfo {
+        return AppInfo(
+            name = response.productName,
+            appId = response.appId,
+            category = AppCategory.from(response.appCategory) ?: AppCategory.YANNUO,
+            createTime = response.createTime,
+            updateTime = response.updateTime,
+            remark = response.remark,
+            description = response.versionDesc ?: "",
+            size = "N/A", // Placeholder
+            downloadCount = 0, // Placeholder
+            packageName = response.appId, // Use appId as a temporary substitute for packageName
+            apkPath = "", // Placeholder, critical for install
+            installState = localApp?.installState ?: InstallState.NOT_INSTALLED,
+            versionName = response.version ?: "N/A",
+            releaseDate = response.updateTime ?: response.createTime,
+            downloadStatus = localApp?.downloadStatus ?: DownloadStatus.NONE,
+            progress = localApp?.progress ?: 0
+        )
     }
 
     private suspend fun resolveDownloadApkPath(
