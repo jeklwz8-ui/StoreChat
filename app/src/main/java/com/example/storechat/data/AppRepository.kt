@@ -171,24 +171,74 @@ object AppRepository {
         }
     }
 
+    /**
+     * 解析APK下载路径
+     * 通过调用服务器API获取指定应用版本的真实下载链接
+     * 
+     * 实现流程：
+     * 1. 构造下载链接查询请求
+     * 2. 调用API服务获取下载链接
+     * 3. 检查响应结果并提取下载链接
+     * 4. 处理异常情况，返回备用路径
+     * 
+     * 设计考虑：
+     * 1. 使用suspend函数支持协程调用
+     * 2. 提供fallback机制确保在API调用失败时仍有备用方案
+     * 3. 完善的异常处理保证方法稳定性
+     * 
+     * @param appId 应用ID，用于标识需要下载的应用
+     * @param versionName 版本名称，用于指定需要下载的具体版本
+     * @param fallbackApkPath 备用APK路径，当API调用失败时使用
+     * @return 真实的APK下载链接或备用路径
+     */
     private suspend fun resolveDownloadApkPath(
+        /**
+         * 应用ID
+         * 用于标识需要下载APK的应用
+         */
         appId: String, 
+        
+        /**
+         * 版本名称
+         * 用于指定需要下载的具体版本
+         */
         versionName: String, 
+        
+        /**
+         * 备用APK路径
+         * 当API调用失败或返回无效数据时使用的备用路径
+         */
         fallbackApkPath: String
     ): String {
+        // 使用try-catch包围整个过程，确保异常不会向上传播
         return try {
+            // 1. 调用API服务获取下载链接
+            // 构造请求参数并发送请求到服务器
             val response = apiService.getDownloadLink(
+                // 构造下载链接查询请求对象
                 AppVersionDownloadRequest(
+                    // 设置应用ID参数
                     appId = appId,
+                    // 设置版本名称参数
                     version = versionName
                 )
             )
+            
+            // 2. 检查响应结果并提取下载链接
+            // 验证响应状态码是否为成功(200)
+            // 确保响应数据不为null
+            // 确保下载链接不为空白
             if (response.code == 200 && response.data != null && response.data.fileUrl.isNotBlank()) {
+                // 如果所有条件都满足，返回服务器提供的真实下载链接
                 response.data.fileUrl
             } else {
+                // 如果任一条件不满足，使用备用APK路径
                 fallbackApkPath
             }
         } catch (e: Exception) {
+            // 3. 处理异常情况，返回备用路径
+            // 捕获所有可能的异常（网络异常、解析异常等）
+            // 在出现异常时，返回备用APK路径确保功能可用性
             fallbackApkPath
         }
     }
@@ -304,34 +354,84 @@ object AppRepository {
         removeFromDownloadQueue(app.packageName)
     }
 
+    /**
+     * 加载指定应用的历史版本列表
+     * 从服务器获取应用的历史版本信息，并转换为内部使用的数据格式
+     * 
+     * 实现流程：
+     * 1. 调用API服务查询应用历史版本
+     * 2. 检查响应状态码确认请求是否成功
+     * 3. 将服务器返回的数据转换为内部使用的HistoryVersion对象
+     * 4. 处理异常情况，确保方法不会抛出异常
+     * 
+     * 数据映射规则：
+     * - versionName <- AppVersionHistoryItem.version
+     * - apkPath <- AppVersionHistoryItem.versionDesc ?? AppVersionHistoryItem.remark ?? ""
+     * 
+     * @param app 需要查询历史版本的应用信息
+     * @return 历史版本列表，如果查询失败则返回空列表
+     */
     suspend fun loadHistoryVersions(app: AppInfo): List<HistoryVersion> {
         return try {
+            // 1. 调用API服务查询应用历史版本
+            // 构造请求参数，使用应用的appId进行查询
             val response = apiService.getAppHistory(
                 AppVersionHistoryRequest(appId = app.appId)
             )
+            
+            // 2. 检查响应状态码确认请求是否成功
+            // 只有状态码为200时才认为请求成功
             if (response.code == 200 && response.data != null) {
+                // 3. 将服务器返回的数据转换为内部使用的HistoryVersion对象
+                // 遍历服务器返回的版本列表，进行数据映射和转换
                 response.data.map { versionItem ->
                     HistoryVersion(
+                        // 版本名称直接使用服务器返回的version字段
                         versionName = versionItem.version, // Mapping from the new response field
+                        
+                        // APK路径优先使用versionDesc，如果没有则使用remark，都不存在则使用空字符串
+                        // 这种设计是为了兼容不同情况下服务器返回的数据结构
                         apkPath = versionItem.versionDesc ?: versionItem.remark ?: "" // Use description or remark as a placeholder for path
                     )
                 }
             } else {
+                // 如果服务器返回错误状态码，则返回空列表
                 emptyList()
             }
         } catch (e: Exception) {
+            // 4. 处理异常情况，确保方法不会抛出异常
+            // 捕获所有异常并打印堆栈跟踪，便于问题排查
             e.printStackTrace()
+            // 发生异常时返回空列表，避免影响上层调用
             emptyList()
         }
     }
 
+    /**
+     * 安装指定的历史版本
+     * 通过解析真实的APK下载路径并调用安装服务进行安装
+     * 
+     * 实现流程：
+     * 1. 在后台协程中执行安装流程
+     * 2. 解析真实的APK下载路径
+     * 3. 调用XC服务管理器进行APK安装
+     * 
+     * @param packageName 应用包名
+     * @param historyVersion 需要安装的历史版本信息
+     */
     fun installHistoryVersion(packageName: String, historyVersion: HistoryVersion) {
+        // 在后台协程中执行安装流程，避免阻塞主线程
         coroutineScope.launch {
+            // 解析真实的APK下载路径
+            // 通过resolveDownloadApkPath方法获取可以直接下载的APK链接
             val realApkPath = resolveDownloadApkPath(
                 appId = packageName, // Assuming packageName is used as appId here
                 versionName = historyVersion.versionName,
                 fallbackApkPath = historyVersion.apkPath
             )
+            
+            // 调用XC服务管理器进行APK安装
+            // 使用解析得到的真实APK路径进行安装
             XcServiceManager.installApk(realApkPath, packageName, true)
         }
     }
