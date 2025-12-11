@@ -6,9 +6,7 @@ import com.google.gson.annotations.SerializedName
 
 data class AppVersionHistoryRequest(
     @SerializedName("appId")
-    val appId: String,
-    @SerializedName("version")
-    val version: String? = null // Optional, for querying a specific version
+    val appId: String
 )
 
 // --- Response ---
@@ -23,6 +21,8 @@ data class AppVersionHistoryResponse(
 )
 
 data class AppVersionHistoryItem(
+    @SerializedName("id")
+    val id: Long, // 根据文档，版本主键id是Long类型
     @SerializedName("appId")
     val appId: String,
     @SerializedName("fileUrl")

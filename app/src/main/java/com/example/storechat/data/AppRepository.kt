@@ -149,6 +149,7 @@ object AppRepository {
         return AppInfo(
             name = response.productName,
             appId = response.appId,
+            versionId = response.id?.toLong(), // **MODIFIED: Store the version ID**
             category = AppCategory.from(response.appCategory) ?: AppCategory.YANNUO,
             createTime = response.createTime,
             updateTime = response.updateTime,
@@ -303,7 +304,8 @@ object AppRepository {
             if (response.code == 200 && response.data != null) {
                 response.data.map { versionItem ->
                     HistoryVersion(
-                        versionName = versionItem.version, // Mapping from the new response field
+                        versionId = versionItem.id, // **MODIFIED: Store the version ID**
+                        versionName = versionItem.version,
                         apkPath = versionItem.versionDesc ?: versionItem.remark ?: "" // Use description or remark as a placeholder for path
                     )
                 }

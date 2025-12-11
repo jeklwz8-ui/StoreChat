@@ -11,6 +11,7 @@ enum class InstallState {
 data class AppInfo(
     val name: String,
     val appId: String, // from server
+    val versionId: Long?, // from server, the ID of the latest version
     val category: AppCategory, // from server
     val createTime: String, // from server
     val updateTime: String?, // from server
