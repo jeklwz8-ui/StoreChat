@@ -204,71 +204,93 @@ object AppRepository {
 
                 val newJob = coroutineScope.launch(start = CoroutineStart.LAZY) {
                     try {
+                        // 1) 获取后端真实下载地址（fileUrl）
                         val realApkPath = resolveDownloadApkPath(app.appId, versionId)
                         if (realApkPath.isBlank()) {
                             throw IllegalStateException("Download URL is blank for versionId $versionId")
                         }
 
+                        // 2) 更新状态为 DOWNLOADING
                         updateAppStatus(app.packageName) {
-                            it.copy(downloadStatus = DownloadStatus.DOWNLOADING)
+                            it.copy(downloadStatus = DownloadStatus.DOWNLOADING, progress = 0)
                         }
 
-                        for (p in app.progress..100) {
-                            delay(80L)
-                            updateAppStatus(app.packageName) { it.copy(progress = p) }
+                        // 3) 使用 XcServiceManager 下载并安装，期间回调进度更新 UI
+                        val downloadSuccess = XcServiceManager.downloadAndInstall(
+                            apkUrl = realApkPath,
+                            packageName = app.packageName,
+                            openAfter = true,
+                            progressCallback = { percent ->
+                                // 更新进度值到 AppInfo 中（0..100）
+                                updateAppStatus(app.packageName) { current ->
+                                    current.copy(progress = percent)
+                                }
+                            }
+                        )
+
+                        if (!downloadSuccess) {
+                            throw IllegalStateException("Download or install failed for ${app.name}")
                         }
 
+                        // 4) 安装期间/完成的状态更新
                         updateAppStatus(app.packageName) {
-                            it.copy(downloadStatus = DownloadStatus.VERIFYING)
-                        }
-                        delay(500)
-
-                        updateAppStatus(app.packageName) {
-                            it.copy(downloadStatus = DownloadStatus.INSTALLING)
-                        }
-                        XcServiceManager.installApk(realApkPath, app.packageName, true)
-                        delay(1500)
-
-                        var installedApp: AppInfo? = null
-                        updateAppStatus(app.packageName) {
-                            installedApp = it.copy(
-                                downloadStatus = DownloadStatus.NONE,
-                                progress = 0,
-                                installState = InstallState.INSTALLED_LATEST
-                            )
-                            installedApp!!
+                            it.copy(downloadStatus = DownloadStatus.NONE, progress = 0, installState = InstallState.INSTALLED_LATEST)
                         }
 
+                        // 5) 移除任务、从队列删掉并加入已安装列表
                         downloadJobs.remove(app.packageName)
                         removeFromDownloadQueue(app.packageName)
-                        installedApp?.let { addToRecentInstalled(it) }
+                        addToRecentInstalled(
+                            AppInfo(
+                                name = app.name,
+                                appId = app.appId,
+                                versionId = app.versionId,
+                                category = app.category,
+                                createTime = app.createTime,
+                                updateTime = app.updateTime,
+                                remark = app.remark,
+                                description = app.description,
+                                size = app.size,
+                                downloadCount = app.downloadCount,
+                                packageName = app.packageName,
+                                apkPath = "", // 本地路径若需要可在 XcServiceManager 中返回
+                                installState = InstallState.INSTALLED_LATEST,
+                                versionName = app.versionName,
+                                releaseDate = app.releaseDate,
+                                downloadStatus = DownloadStatus.NONE,
+                                progress = 0
+                            )
+                        )
 
-                    } catch (e: Exception) {
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        // 取消：可能来自用户主动取消
                         val packageName = app.packageName
                         val wasDeletion = cancellationsForDeletion.remove(packageName)
 
-                        if (e is kotlinx.coroutines.CancellationException) {
-                            if (wasDeletion) {
-                                updateAppStatus(packageName) {
-                                    it.copy(downloadStatus = DownloadStatus.NONE, progress = 0)
-                                }
-                            } else {
-                                updateAppStatus(packageName) {
-                                    it.copy(downloadStatus = DownloadStatus.PAUSED)
-                                }
+                        if (wasDeletion) {
+                            updateAppStatus(packageName) {
+                                it.copy(downloadStatus = DownloadStatus.NONE, progress = 0)
                             }
-                            downloadJobs.remove(packageName)
-                            if (!wasDeletion) throw e
                         } else {
-                            Log.e("DOWNLOAD", "Download/Install failed for ${app.name}", e)
                             updateAppStatus(packageName) {
                                 it.copy(downloadStatus = DownloadStatus.PAUSED)
                             }
-                            downloadJobs.remove(packageName)
                         }
+                        downloadJobs.remove(app.packageName)
+                        // 若是非删除操作，向上抛出异常到调用方
+                        if (!wasDeletion) throw e
+
+                    } catch (e: Exception) {
+                        // 一般错误：记录日志并切换到 PAUSED
+                        Log.e("DOWNLOAD", "Download/Install failed for ${app.name}", e)
+                        updateAppStatus(app.packageName) {
+                            it.copy(downloadStatus = DownloadStatus.PAUSED)
+                        }
+                        downloadJobs.remove(app.packageName)
                     }
                 }
 
+                // 记录并启动下载任务
                 downloadJobs[app.packageName] = newJob
                 newJob.start()
             }
@@ -278,6 +300,7 @@ object AppRepository {
             }
         }
     }
+
 
     fun cancelDownload(app: AppInfo) {
         val packageName = app.packageName
