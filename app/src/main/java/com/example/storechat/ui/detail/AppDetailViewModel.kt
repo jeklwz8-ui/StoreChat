@@ -1,5 +1,6 @@
 package com.example.storechat.ui.detail
 
+import android.content.Context
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MediatorLiveData
 import androidx.lifecycle.MutableLiveData
@@ -40,9 +41,9 @@ class AppDetailViewModel : ViewModel() {
         _appInfo.value = app
     }
 
-    fun loadHistoryFor(app: AppInfo) {
+    fun loadHistoryFor(context: Context, app: AppInfo) {
         viewModelScope.launch {
-            val history = AppRepository.loadHistoryVersions(app)
+            val history = AppRepository.loadHistoryVersions(context, app)
             _historyVersions.postValue(history)
         }
     }

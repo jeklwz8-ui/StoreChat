@@ -10,6 +10,7 @@ import androidx.fragment.app.activityViewModels
 import com.example.storechat.data.AppRepository
 import com.example.storechat.databinding.FragmentHistoryVersionBinding
 import com.example.storechat.model.AppInfo
+import com.example.storechat.model.InstallState
 
 class HistoryVersionFragment : Fragment() {
 
@@ -38,7 +39,7 @@ class HistoryVersionFragment : Fragment() {
         observeViewModel()
 
         viewModel.appInfo.value?.let {
-            viewModel.loadHistoryFor(it)
+            viewModel.loadHistoryFor(requireContext(), it)
         }
     }
 
@@ -50,11 +51,21 @@ class HistoryVersionFragment : Fragment() {
                     Toast.makeText(requireContext(), "应用信息不存在", Toast.LENGTH_SHORT).show()
                     return@HistoryVersionAdapter
                 }
-                Toast.makeText(requireContext(), "开始安装：${historyVersion.versionName}", Toast.LENGTH_SHORT).show()
-                AppRepository.installHistoryVersion(
-                    app = currentApp,
-                    historyVersion = historyVersion
-                )
+
+                if (historyVersion.installState == InstallState.INSTALLED_LATEST) {
+                    val intent = requireContext().packageManager.getLaunchIntentForPackage(currentApp.packageName)
+                    if (intent != null) {
+                        startActivity(intent)
+                    } else {
+                        Toast.makeText(requireContext(), "无法打开应用", Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    Toast.makeText(requireContext(), "开始安装：${historyVersion.versionName}", Toast.LENGTH_SHORT).show()
+                    AppRepository.installHistoryVersion(
+                        app = currentApp,
+                        historyVersion = historyVersion
+                    )
+                }
             },
             onItemClick = { historyVersion ->
                 val currentApp = viewModel.appInfo.value
@@ -62,11 +73,10 @@ class HistoryVersionFragment : Fragment() {
                     Toast.makeText(requireContext(), "应用信息不存在", Toast.LENGTH_SHORT).show()
                     return@HistoryVersionAdapter
                 }
-                // Create a temporary AppInfo for the specific historical version
                 val historyAppInfo = currentApp.copy(
                     versionId = historyVersion.versionId,
                     versionName = historyVersion.versionName,
-                    description = historyVersion.apkPath // Assuming apkPath holds description
+                    description = historyVersion.apkPath
                 )
                 AppDetailActivity.startWithAppInfo(requireContext(), historyAppInfo)
             }

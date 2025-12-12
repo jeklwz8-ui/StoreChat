@@ -316,17 +316,27 @@ object AppRepository {
         toggleDownload(historyAppInfo)
     }
 
-    suspend fun loadHistoryVersions(app: AppInfo): List<HistoryVersion> {
+    suspend fun loadHistoryVersions(context: Context, app: AppInfo): List<HistoryVersion> {
         return try {
+            val installedVersionCode = AppUtils.getInstalledVersionCode(context, app.packageName)
+
             val response = apiService.getAppHistory(
                 AppVersionHistoryRequest(appId = app.appId)
             )
+
             if (response.code == 200 && response.data != null) {
                 response.data.map { versionItem ->
+                    val state = if (versionItem.versionCode.toLongOrNull() == installedVersionCode) {
+                        InstallState.INSTALLED_LATEST // Using LATEST as it means "this one is installed"
+                    } else {
+                        InstallState.NOT_INSTALLED
+                    }
+
                     HistoryVersion(
                         versionId = versionItem.id,
                         versionName = versionItem.version,
-                        apkPath = ""
+                        apkPath = "", // Not needed anymore
+                        installState = state
                     )
                 }
             } else {

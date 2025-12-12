@@ -1,14 +1,28 @@
 package com.example.storechat.model
 
+import java.io.Serializable
+
 /**
- * 表示一个历史版本的数据类
+ * Represents a historical version of an app.
  *
- * @param versionId 版本ID, from server
- * @param versionName 版本名称，例如 "1.0.2"
- * @param apkPath 对应的 APK 文件路径 (临时使用 versionDesc)
+ * @param versionId The unique ID of this version from the server.
+ * @param versionName The display name of the version (e.g., "1.0.2").
+ * @param apkPath Placeholder for the APK file path.
+ * @param installState The installation state of this specific version on the device.
  */
 data class HistoryVersion(
     val versionId: Long,
     val versionName: String,
-    val apkPath: String
-)
+    val apkPath: String,
+    var installState: InstallState = InstallState.NOT_INSTALLED
+) : Serializable {
+
+    val buttonText: String
+        get() = when (installState) {
+            InstallState.INSTALLED_LATEST, InstallState.INSTALLED_OLD -> "打开"
+            else -> "安装"
+        }
+
+    val isButtonEnabled: Boolean
+        get() = true // Always clickable in history list
+}
