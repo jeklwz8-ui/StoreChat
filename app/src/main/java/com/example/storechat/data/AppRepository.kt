@@ -23,7 +23,7 @@ object AppRepository {
     private val coroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     private val downloadJobs = ConcurrentHashMap<String, Job>()
-    private val cancellationsForDeletion = ConcurrentHashMap.newKeySet<String>() // Re-introduced for distinguishing pause vs delete
+    private val cancellationsForDeletion = ConcurrentHashMap.newKeySet<String>()
 
     private val apiService = ApiClient.appApi
 
@@ -136,11 +136,15 @@ object AppRepository {
             )
 
             if (response.code == 200 && response.data != null) {
-                val remoteList = response.data
+                // ★★★ Fix: Group by appId and take the one with the highest version (id) ★★★
+                val distinctList = response.data
+                    .groupBy { it.appId }
+                    .map { (_, apps) -> apps.maxByOrNull { it.id ?: -1 }!! }
+
                 synchronized(stateLock) {
                     val localAppsMap = localAllApps.associateBy { it.appId }
 
-                    val mergedRemoteList = remoteList.map { serverApp ->
+                    val mergedRemoteList = distinctList.map { serverApp ->
                         val localApp = localAppsMap[serverApp.appId]
 
                         var realPackageName = AppPackageNameCache.getPackageNameByAppId(serverApp.appId)
@@ -220,8 +224,7 @@ object AppRepository {
 
         when (app.downloadStatus) {
             DownloadStatus.DOWNLOADING -> {
-                // This is a PAUSE operation, it does not delete the file
-                downloadJobs[app.packageName]?.cancel() 
+                downloadJobs[app.packageName]?.cancel()
             }
 
             DownloadStatus.NONE, DownloadStatus.PAUSED -> {
@@ -282,11 +285,9 @@ object AppRepository {
                         val isDeletion = cancellationsForDeletion.remove(packageName)
 
                         if (!isDeletion) {
-                            // This was a pause, not a deletion
                             updateAppStatus(packageName) { it.copy(downloadStatus = DownloadStatus.PAUSED) }
                         }
-                        // For both pause and delete, remove the job
-                        downloadJobs.remove(packageName)
+                        downloadJobs.remove(app.packageName)
 
                     } catch (e: Exception) {
                         Log.e("DOWNLOAD", "Download/Install failed for ${app.name}", e)
@@ -350,15 +351,10 @@ object AppRepository {
     }
 
     fun removeDownload(app: AppInfo) {
-        // 1. Signal that this is a deletion
         cancellationsForDeletion.add(app.packageName)
-        // 2. Cancel the running job
         downloadJobs[app.packageName]?.cancel()
-        // 3. Delete the physical file
         app.versionId?.let { XcServiceManager.deleteDownloadedFile(app.appId, it) }
-        // 4. Remove from the queue UI
         removeFromDownloadQueue(app.packageName)
-        // 5. Reset the status in the main list to its original pre-download state
         updateAppStatus(app.packageName) {
             it.copy(downloadStatus = DownloadStatus.NONE, progress = 0)
         }
