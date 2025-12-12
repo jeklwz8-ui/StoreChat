@@ -35,6 +35,12 @@ class DownloadQueueActivity : AppCompatActivity() {
         observeViewModel()
     }
 
+    override fun onResume() {
+        super.onResume()
+        // 确保每次恢复时都正确更新UI状态
+        updateEmptyViewVisibility()
+    }
+
     private fun setupRecyclerView() {
         // 下载列表
         downloadAdapter = DownloadQueueAdapter(viewModel)
@@ -82,7 +88,7 @@ class DownloadQueueActivity : AppCompatActivity() {
             downloadAdapter.submitList(tasks)
             updateEmptyViewVisibility()
 
-            // 只要还有“已暂停”的任务，就显示「全部继续」
+            // 只要还有"已暂停"的任务，就显示「全部继续」
             binding.tvResumeAll?.isVisible =
                 tasks.any { it.status == DownloadStatus.PAUSED }
         }
@@ -92,6 +98,9 @@ class DownloadQueueActivity : AppCompatActivity() {
         val isDownloadListEmpty = viewModel.downloadTasks.value.isNullOrEmpty()
         val isRecentListEmpty = viewModel.recentInstalled.value.isNullOrEmpty()
         binding.layoutEmpty?.isVisible = isDownloadListEmpty && isRecentListEmpty
+        
+        // 添加调试日志
+        android.util.Log.d("DownloadQueue", "isDownloadListEmpty=$isDownloadListEmpty, isRecentListEmpty=$isRecentListEmpty, layoutEmpty visibility=${binding.layoutEmpty?.isVisible}")
     }
 
     companion object {
