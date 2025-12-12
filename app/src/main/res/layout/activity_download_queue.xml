@@ -166,8 +166,8 @@
                         android:layout_marginTop="12dp"
                         android:nestedScrollingEnabled="false"
                         android:orientation="horizontal"
-                        tools:listitem="@layout/item_recent_app"
-                        tools:itemCount="4" />
+                        tools:itemCount="4"
+                        tools:listitem="@layout/item_recent_app" />
 
                 </LinearLayout>
 

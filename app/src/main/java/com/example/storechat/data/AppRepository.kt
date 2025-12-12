@@ -23,6 +23,7 @@ object AppRepository {
     private val coroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     private val downloadJobs = ConcurrentHashMap<String, Job>()
+    private val cancellationsForDeletion = ConcurrentHashMap.newKeySet<String>() // Re-introduced for distinguishing pause vs delete
 
     private val apiService = ApiClient.appApi
 
@@ -219,7 +220,8 @@ object AppRepository {
 
         when (app.downloadStatus) {
             DownloadStatus.DOWNLOADING -> {
-                cancelDownload(app) // This is a PAUSE operation
+                // This is a PAUSE operation, it does not delete the file
+                downloadJobs[app.packageName]?.cancel() 
             }
 
             DownloadStatus.NONE, DownloadStatus.PAUSED -> {
@@ -276,10 +278,15 @@ object AppRepository {
                         removeFromDownloadQueue(app.packageName)
 
                     } catch (e: kotlinx.coroutines.CancellationException) {
-                        // This block is now only for job cancellations, not for pause logic
-                        Log.d("DOWNLOAD", "Job for ${app.packageName} was cancelled.")
-                        updateAppStatus(app.packageName) { it.copy(downloadStatus = DownloadStatus.PAUSED) }
-                        downloadJobs.remove(app.packageName)
+                        val packageName = app.packageName
+                        val isDeletion = cancellationsForDeletion.remove(packageName)
+
+                        if (!isDeletion) {
+                            // This was a pause, not a deletion
+                            updateAppStatus(packageName) { it.copy(downloadStatus = DownloadStatus.PAUSED) }
+                        }
+                        // For both pause and delete, remove the job
+                        downloadJobs.remove(packageName)
 
                     } catch (e: Exception) {
                         Log.e("DOWNLOAD", "Download/Install failed for ${app.name}", e)
@@ -342,19 +349,16 @@ object AppRepository {
         }
     }
 
-    fun cancelDownload(app: AppInfo) {
-        val job = downloadJobs[app.packageName]
-        job?.cancel()
-    }
-
     fun removeDownload(app: AppInfo) {
-        // 1. Cancel the running job
-        cancelDownload(app)
-        // 2. Remove from the queue UI
-        removeFromDownloadQueue(app.packageName)
+        // 1. Signal that this is a deletion
+        cancellationsForDeletion.add(app.packageName)
+        // 2. Cancel the running job
+        downloadJobs[app.packageName]?.cancel()
         // 3. Delete the physical file
         app.versionId?.let { XcServiceManager.deleteDownloadedFile(app.appId, it) }
-        // 4. Reset the status in the main list
+        // 4. Remove from the queue UI
+        removeFromDownloadQueue(app.packageName)
+        // 5. Reset the status in the main list to its original pre-download state
         updateAppStatus(app.packageName) {
             it.copy(downloadStatus = DownloadStatus.NONE, progress = 0)
         }

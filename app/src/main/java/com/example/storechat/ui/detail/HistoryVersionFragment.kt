@@ -76,7 +76,8 @@ class HistoryVersionFragment : Fragment() {
                 val historyAppInfo = currentApp.copy(
                     versionId = historyVersion.versionId,
                     versionName = historyVersion.versionName,
-                    description = historyVersion.apkPath
+                    description = historyVersion.apkPath,
+                    installState = historyVersion.installState // Pass the correct install state
                 )
                 AppDetailActivity.startWithAppInfo(requireContext(), historyAppInfo)
             }
