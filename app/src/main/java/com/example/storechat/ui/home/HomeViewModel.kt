@@ -1,6 +1,7 @@
 package com.example.storechat.ui.home
 
 import android.content.Context
+import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MediatorLiveData
 import androidx.lifecycle.MutableLiveData
@@ -13,6 +14,8 @@ import com.example.storechat.model.InstallState
 import com.example.storechat.model.UpdateStatus
 
 class HomeViewModel : ViewModel() {
+
+    private val TAG = "HomeViewModel"
 
     // --- 基础 UI 数据 --- //
     val appVersion: LiveData<String>
@@ -131,6 +134,7 @@ class HomeViewModel : ViewModel() {
 
     fun handleAppAction(app: AppInfo) {
         if (app.installState == InstallState.INSTALLED_LATEST) {
+            Log.d(TAG, "Attempting to open app. PackageName: ${app.packageName}")
             _navigationEvent.value = app.packageName
         } else {
             AppRepository.toggleDownload(app)

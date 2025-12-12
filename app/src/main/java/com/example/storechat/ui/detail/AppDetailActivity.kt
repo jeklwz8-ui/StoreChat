@@ -4,10 +4,12 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
+import android.util.Log
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.databinding.DataBindingUtil
@@ -15,6 +17,7 @@ import com.example.storechat.R
 import com.example.storechat.data.AppRepository
 import com.example.storechat.databinding.ActivityAppDetailBinding
 import com.example.storechat.model.AppInfo
+import com.example.storechat.model.InstallState
 import com.example.storechat.ui.download.DownloadQueueActivity
 import com.example.storechat.ui.search.SearchActivity
 import com.google.android.material.tabs.TabLayoutMediator
@@ -22,6 +25,7 @@ import me.jessyan.autosize.internal.CustomAdapt
 
 class AppDetailActivity : AppCompatActivity() , CustomAdapt {
 
+    private val TAG = "AppDetailActivity"
     private lateinit var binding: ActivityAppDetailBinding
     private val viewModel: AppDetailViewModel by viewModels()
 
@@ -58,7 +62,19 @@ class AppDetailActivity : AppCompatActivity() , CustomAdapt {
 
         val clickListener: (view: View) -> Unit = {
             viewModel.appInfo.value?.let { currentAppInfo ->
-                AppRepository.toggleDownload(currentAppInfo)
+                if (currentAppInfo.installState == InstallState.INSTALLED_LATEST) {
+                    Log.d(TAG, "Attempting to open app. PackageName: ${currentAppInfo.packageName}")
+                    val intent = packageManager.getLaunchIntentForPackage(currentAppInfo.packageName)
+                    if (intent != null) {
+                        Log.d(TAG, "Launch intent created successfully. Starting activity...")
+                        startActivity(intent)
+                    } else {
+                        Log.e(TAG, "Failed to create launch intent. The app might not be launchable.")
+                        Toast.makeText(this, "无法打开应用", Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    AppRepository.toggleDownload(currentAppInfo)
+                }
             }
         }
 

@@ -33,10 +33,7 @@ data class AppInfo(
         installState = if (!isInstalled) {
             InstallState.NOT_INSTALLED
         } else {
-            // 在这里，我们假设如果 isInstalled 为 true，
-            // 那么我们已经通过比较版本号确定了是旧版本还是最新版本
-            // 这个逻辑需要在使用 AppInfo 的地方进行处理
-            installState // 保留外部设置的 installState
+            installState
         }
     }
 
@@ -56,8 +53,7 @@ data class AppInfo(
     val buttonEnabled: Boolean
         get() = when (downloadStatus) {
             DownloadStatus.VERIFYING, DownloadStatus.INSTALLING -> false
-            DownloadStatus.NONE -> installState != InstallState.INSTALLED_LATEST
-            else -> true
+            else -> true // Button is always enabled unless verifying or installing
         }
 
     val showProgress: Boolean
