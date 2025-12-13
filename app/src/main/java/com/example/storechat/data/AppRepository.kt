@@ -10,6 +10,7 @@ import com.example.storechat.model.*
 import com.example.storechat.util.AppPackageNameCache
 import com.example.storechat.util.AppUtils
 import com.example.storechat.xc.XcServiceManager
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -22,6 +23,10 @@ object AppRepository {
 
     private val coroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
+    /**
+     * ✅ 方案B：下载任务按 taskKey 管理
+     * taskKey = "packageName@versionId"
+     */
     private val downloadJobs = ConcurrentHashMap<String, Job>()
     private val cancellationsForDeletion = ConcurrentHashMap.newKeySet<String>()
 
@@ -62,66 +67,84 @@ object AppRepository {
         }
     }
 
-    fun initialize(context: Context) {
-        coroutineScope.launch {
-            refreshAppsFromServer(context, AppCategory.YANNUO)
-        }
+    // ----------------------------
+    // ✅ taskKey helpers
+    // ----------------------------
+
+    private fun taskKey(packageName: String, versionId: Long): String = "$packageName@$versionId"
+
+    private fun taskKey(app: AppInfo): String? {
+        val vid = app.versionId ?: return null
+        return taskKey(app.packageName, vid)
     }
 
-    private fun updateAppStatus(packageName: String, transform: (AppInfo) -> AppInfo) {
+    // ----------------------------
+    // ✅ 状态更新（主列表按 packageName，队列按 taskKey）
+    // ----------------------------
+
+    private fun updateAppStatus(
+        packageName: String,
+        versionId: Long?,
+        transform: (AppInfo) -> AppInfo
+    ) {
         synchronized(stateLock) {
-            var appToTransform: AppInfo? = null
-            var appExistsInAllApps = false
+            val key = versionId?.let { taskKey(packageName, it) }
 
-            val initialApp = localAllApps.find { it.packageName == packageName }
-            if (initialApp != null) {
-                appToTransform = initialApp
-                appExistsInAllApps = true
-            } else {
-                appToTransform = localDownloadQueue.find { it.packageName == packageName }
+            // 1) 主列表（一个包只保留一个条目）
+            val master = localAllApps.find { it.packageName == packageName }
+            val newMaster = master?.let(transform)
+
+            // 2) 队列（同包可多个版本）
+            val queueItem = key?.let { k -> localDownloadQueue.find { taskKey(it) == k } }
+            val newQueueItem = queueItem?.let(transform)
+
+            var allAppsChanged = false
+            var queueChanged = false
+
+            if (newMaster != null) {
+                localAllApps = localAllApps.map { if (it.packageName == packageName) newMaster else it }
+                allAppsChanged = true
             }
 
-            if (appToTransform == null) return
-
-            val newApp = transform(appToTransform)
-
-            if (appExistsInAllApps) {
-                localAllApps = localAllApps.map { if (it.packageName == packageName) newApp else it }
+            if (key != null && newQueueItem != null) {
+                localDownloadQueue = localDownloadQueue.map { if (taskKey(it) == key) newQueueItem else it }
+                queueChanged = true
             }
 
-            if (localDownloadQueue.any { it.packageName == packageName }) {
-                localDownloadQueue = localDownloadQueue.map { if (it.packageName == packageName) newApp else it }
-                _downloadQueue.postValue(localDownloadQueue)
-            }
-
-            if (appExistsInAllApps) {
-                _allApps.postValue(localAllApps)
-            }
+            if (queueChanged) _downloadQueue.postValue(localDownloadQueue)
+            if (allAppsChanged) _allApps.postValue(localAllApps)
         }
     }
 
     private fun addToDownloadQueue(app: AppInfo) {
+        val key = taskKey(app) ?: return
         synchronized(stateLock) {
-            if (localDownloadQueue.none { it.packageName == app.packageName }) {
+            if (localDownloadQueue.none { taskKey(it) == key }) {
                 localDownloadQueue = localDownloadQueue + app
                 _downloadQueue.postValue(localDownloadQueue)
             }
         }
     }
 
-    private fun removeFromDownloadQueue(packageName: String) {
+    private fun removeFromDownloadQueue(taskKey: String) {
         synchronized(stateLock) {
-            localDownloadQueue = localDownloadQueue.filterNot { it.packageName == packageName }
+            localDownloadQueue = localDownloadQueue.filterNot { taskKey(it) == taskKey }
             _downloadQueue.postValue(localDownloadQueue)
         }
     }
-    
+
     private fun addToRecentInstalled(app: AppInfo) {
         synchronized(stateLock) {
             if (localRecentApps.none { it.packageName == app.packageName }) {
                 localRecentApps = listOf(app) + localRecentApps
                 _recentInstalledApps.postValue(localRecentApps)
             }
+        }
+    }
+
+    fun initialize(context: Context) {
+        coroutineScope.launch {
+            refreshAppsFromServer(context, AppCategory.YANNUO)
         }
     }
 
@@ -140,7 +163,6 @@ object AppRepository {
             )
 
             if (response.code == 200 && response.data != null) {
-                // ★★★ Fix: Group by appId and take the one with the highest version (id) ★★★
                 val distinctList = response.data
                     .groupBy { it.appId }
                     .map { (_, apps) -> apps.maxByOrNull { it.id ?: -1 }!! }
@@ -162,7 +184,7 @@ object AppRepository {
                         val finalPackageName = realPackageName ?: serverApp.appId
                         val installedVersionCode = AppUtils.getInstalledVersionCode(context, finalPackageName)
                         val isInstalled = installedVersionCode != -1L
-                        
+
                         val serverVersionCode = serverApp.versionCode?.toLongOrNull()
 
                         val installState = when {
@@ -171,21 +193,23 @@ object AppRepository {
                             else -> InstallState.INSTALLED_LATEST
                         }
 
-                        mapToAppInfo(serverApp, localApp).copy(packageName = finalPackageName, installState = installState, isInstalled = isInstalled)
+                        mapToAppInfo(serverApp, localApp).copy(
+                            packageName = finalPackageName,
+                            installState = installState,
+                            isInstalled = isInstalled
+                        )
                     }
 
                     val otherCategoryApps = localAllApps.filter { it.category != category }
                     localAllApps = otherCategoryApps + mergedRemoteList
                     _allApps.postValue(localAllApps)
                 }
-                _isLoading.postValue(false) // Only set to false on success
+                _isLoading.postValue(false) // success 才关闭
             } else {
-                // Keep loading on server error
                 _allApps.postValue(localAllApps.filter { it.category == category })
             }
         } catch (e: Exception) {
             e.printStackTrace()
-            // Keep loading on network error
             _allApps.postValue(localAllApps.filter { it.category == category })
         }
     }
@@ -227,6 +251,11 @@ object AppRepository {
         }
     }
 
+    /**
+     * ✅ 方案B最关键修复点：
+     * 不再用 app.downloadStatus 决定“暂停/继续”，而是用 downloadJobs.containsKey(taskKey)
+     * 避免低版本详情页拿到的状态和真实 job 状态不一致，导致“一点就暂停”
+     */
     fun toggleDownload(app: AppInfo) {
         val versionId = app.versionId
         if (versionId == null) {
@@ -234,98 +263,87 @@ object AppRepository {
             return
         }
 
-        when (app.downloadStatus) {
-            DownloadStatus.DOWNLOADING -> {
-                downloadJobs[app.packageName]?.cancel()
-            }
+        val key = taskKey(app.packageName, versionId)
 
-            DownloadStatus.NONE, DownloadStatus.PAUSED -> {
-                if (downloadJobs.containsKey(app.packageName)) {
-                    return
+        // ✅ 是否正在下载：只认 job
+        val isDownloading = downloadJobs.containsKey(key)
+
+        if (isDownloading) {
+            downloadJobs[key]?.cancel()
+            return
+        }
+
+        // 开始/继续下载
+        addToDownloadQueue(app)
+
+        updateAppStatus(app.packageName, versionId) {
+            it.copy(downloadStatus = DownloadStatus.DOWNLOADING, progress = 0)
+        }
+
+        val newJob = coroutineScope.launch(start = CoroutineStart.LAZY) {
+            try {
+                val realApkPath = resolveDownloadApkPath(app.appId, versionId)
+                if (realApkPath.isBlank()) {
+                    throw IllegalStateException("Download URL is blank for versionId $versionId")
                 }
 
-                addToDownloadQueue(app)
+                val installedPackageName = XcServiceManager.downloadAndInstall(
+                    appId = app.appId,
+                    versionId = versionId,
+                    url = realApkPath,
+                    onProgress = { percent ->
+                        updateAppStatus(app.packageName, versionId) { current ->
+                            current.copy(progress = percent)
+                        }
+                    }
+                )
 
-                // 立即更新状态，提供快速的 UI 反馈
-                updateAppStatus(app.packageName) {
-                    it.copy(downloadStatus = DownloadStatus.DOWNLOADING, progress = 0)
+                if (installedPackageName != null) {
+                    AppPackageNameCache.saveMapping(app.appId, app.name, installedPackageName)
+                } else {
+                    throw IllegalStateException("Download or install failed for ${app.name}")
                 }
 
-                val newJob = coroutineScope.launch(start = CoroutineStart.LAZY) {
-                    try {
-                        val realApkPath = resolveDownloadApkPath(app.appId, versionId)
-                        if (realApkPath.isBlank()) {
-                            throw IllegalStateException("Download URL is blank for versionId $versionId")
-                        }
+                val masterAppInfo = synchronized(stateLock) {
+                    localAllApps.find { it.packageName == app.packageName }
+                }
+                val latestVersionId = masterAppInfo?.versionId ?: app.versionId
 
-                        // 移除此处冗余的状态更新，状态已在外面立即更新
-                        /*
-                        updateAppStatus(app.packageName) {
-                            it.copy(downloadStatus = DownloadStatus.DOWNLOADING, progress = 0)
-                        }
-                        */
+                val newInstallState = if (app.versionId < latestVersionId) {
+                    InstallState.INSTALLED_OLD
+                } else {
+                    InstallState.INSTALLED_LATEST
+                }
 
-                        val installedPackageName = XcServiceManager.downloadAndInstall(
-                            appId = app.appId,
-                            versionId = versionId,
-                            url = realApkPath,
-                            onProgress = { percent ->
-                                updateAppStatus(app.packageName) { current ->
-                                    current.copy(progress = percent)
-                                }
-                            }
-                        )
+                updateAppStatus(app.packageName, versionId) {
+                    it.copy(downloadStatus = DownloadStatus.NONE, progress = 0, installState = newInstallState)
+                }
 
-                        if (installedPackageName != null) {
-                            AppPackageNameCache.saveMapping(app.appId, app.name, installedPackageName)
-                        } else {
-                            throw IllegalStateException("Download or install failed for ${app.name}")
-                        }
+                addToRecentInstalled(app.copy(installState = newInstallState))
 
-                        val masterAppInfo = synchronized(stateLock) { localAllApps.find { it.packageName == app.packageName } }
-                        val latestVersionId = masterAppInfo?.versionId ?: app.versionId
+                downloadJobs.remove(key)
+                removeFromDownloadQueue(key)
 
-                        val newInstallState = if (app.versionId < latestVersionId) {
-                            InstallState.INSTALLED_OLD
-                        } else {
-                            InstallState.INSTALLED_LATEST
-                        }
-
-                        updateAppStatus(app.packageName) {
-                            it.copy(downloadStatus = DownloadStatus.NONE, progress = 0, installState = newInstallState)
-                        }
-                        
-                        addToRecentInstalled(app.copy(installState = newInstallState))
-
-                        downloadJobs.remove(app.packageName)
-                        removeFromDownloadQueue(app.packageName)
-
-                    } catch (e: kotlinx.coroutines.CancellationException) {
-                        val packageName = app.packageName
-                        val isDeletion = cancellationsForDeletion.remove(packageName)
-
-                        if (!isDeletion) {
-                            updateAppStatus(packageName) { it.copy(downloadStatus = DownloadStatus.PAUSED) }
-                        }
-                        downloadJobs.remove(app.packageName)
-
-                    } catch (e: Exception) {
-                        Log.e("DOWNLOAD", "Download/Install failed for ${app.name}", e)
-                        updateAppStatus(app.packageName) {
-                            it.copy(downloadStatus = DownloadStatus.PAUSED)
-                        }
-                        downloadJobs.remove(app.packageName)
+            } catch (e: CancellationException) {
+                val isDeletion = cancellationsForDeletion.remove(key)
+                if (!isDeletion) {
+                    updateAppStatus(app.packageName, versionId) {
+                        it.copy(downloadStatus = DownloadStatus.PAUSED)
                     }
                 }
+                downloadJobs.remove(key)
 
-                downloadJobs[app.packageName] = newJob
-                newJob.start()
-            }
-
-            DownloadStatus.VERIFYING, DownloadStatus.INSTALLING -> {
-                // Ignore clicks
+            } catch (e: Exception) {
+                Log.e("DOWNLOAD", "Download/Install failed for ${app.name}", e)
+                updateAppStatus(app.packageName, versionId) {
+                    it.copy(downloadStatus = DownloadStatus.PAUSED)
+                }
+                downloadJobs.remove(key)
             }
         }
+
+        downloadJobs[key] = newJob
+        newJob.start()
     }
 
     fun installHistoryVersion(app: AppInfo, historyVersion: HistoryVersion) {
@@ -371,11 +389,16 @@ object AppRepository {
     }
 
     fun removeDownload(app: AppInfo) {
-        cancellationsForDeletion.add(app.packageName)
-        downloadJobs[app.packageName]?.cancel()
-        app.versionId?.let { XcServiceManager.deleteDownloadedFile(app.appId, it) }
-        removeFromDownloadQueue(app.packageName)
-        updateAppStatus(app.packageName) {
+        val versionId = app.versionId ?: return
+        val key = taskKey(app.packageName, versionId)
+
+        cancellationsForDeletion.add(key)
+        downloadJobs[key]?.cancel()
+
+        XcServiceManager.deleteDownloadedFile(app.appId, versionId)
+
+        removeFromDownloadQueue(key)
+        updateAppStatus(app.packageName, versionId) {
             it.copy(downloadStatus = DownloadStatus.NONE, progress = 0)
         }
     }
@@ -384,9 +407,7 @@ object AppRepository {
         val pausedApps = synchronized(stateLock) {
             localDownloadQueue.filter { it.downloadStatus == DownloadStatus.PAUSED }
         }
-        pausedApps.forEach {
-            toggleDownload(it)
-        }
+        pausedApps.forEach { toggleDownload(it) }
     }
 
     fun checkAppUpdate() {

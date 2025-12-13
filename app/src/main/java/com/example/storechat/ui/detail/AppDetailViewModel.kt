@@ -22,12 +22,13 @@ class AppDetailViewModel : ViewModel() {
     private val _historyVersions = MutableLiveData<List<HistoryVersion>>()
     val historyVersions: LiveData<List<HistoryVersion>> = _historyVersions
 
-    // 添加加载状态
     private val _isLoading = MutableLiveData<Boolean>()
     val isLoading: LiveData<Boolean> = _isLoading
 
-    // 缓存历史版本数据
     private val historyVersionCache = mutableMapOf<String, List<HistoryVersion>>()
+
+    // ✅ 历史版本展示覆盖（仅覆盖版本号/描述等，状态仍来自 repo）
+    private var historyOverride: AppInfo? = null
 
     fun loadApp(packageName: String) {
         appInfoSource?.let { _appInfo.removeSource(it) }
@@ -36,39 +37,49 @@ class AppDetailViewModel : ViewModel() {
             apps.find { it.packageName == packageName }
         }
 
-        _appInfo.addSource(newSource) { app ->
-            app?.let { _appInfo.value = it }
+        _appInfo.addSource(newSource) { appFromRepo ->
+            appFromRepo?.let { repoApp ->
+                val override = historyOverride
+                _appInfo.value = if (override != null) {
+                    repoApp.copy(
+                        versionId = override.versionId,
+                        versionName = override.versionName,
+                        description = override.description
+                    )
+                } else {
+                    repoApp
+                }
+            }
         }
+
         appInfoSource = newSource
     }
 
     fun setAppInfo(app: AppInfo) {
-        appInfoSource?.let { _appInfo.removeSource(it) }
-        appInfoSource = null
-        _appInfo.value = app
+        historyOverride = null
+        loadApp(app.packageName)
+    }
+
+    fun setHistoryAppInfo(app: AppInfo) {
+        historyOverride = app
+        loadApp(app.packageName)
     }
 
     fun loadHistoryFor(context: Context, app: AppInfo) {
-        // 检查是否有缓存数据
         if (historyVersionCache.containsKey(app.appId)) {
-            // 使用缓存数据
             _historyVersions.value = historyVersionCache[app.appId]
             return
         }
 
-        // 没有缓存数据，发送网络请求
         viewModelScope.launch {
             _isLoading.postValue(true)
             val history = AppRepository.loadHistoryVersions(context, app)
             _historyVersions.postValue(history)
             _isLoading.postValue(false)
-            
-            // 缓存数据
             historyVersionCache[app.appId] = history
         }
     }
-    
-    // 清除缓存的方法（可根据需要调用）
+
     fun clearHistoryCache() {
         historyVersionCache.clear()
     }

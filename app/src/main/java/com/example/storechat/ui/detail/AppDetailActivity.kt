@@ -13,6 +13,7 @@ import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.databinding.DataBindingUtil
+import com.example.storechat.MainActivity
 import com.example.storechat.R
 import com.example.storechat.data.AppRepository
 import com.example.storechat.databinding.ActivityAppDetailBinding
@@ -22,9 +23,8 @@ import com.example.storechat.ui.download.DownloadQueueActivity
 import com.example.storechat.ui.search.SearchActivity
 import com.google.android.material.tabs.TabLayoutMediator
 import me.jessyan.autosize.internal.CustomAdapt
-import com.example.storechat.MainActivity // 导入 MainActivity
 
-class AppDetailActivity : AppCompatActivity() , CustomAdapt {
+class AppDetailActivity : AppCompatActivity(), CustomAdapt {
 
     private val TAG = "AppDetailActivity"
     private lateinit var binding: ActivityAppDetailBinding
@@ -39,7 +39,8 @@ class AppDetailActivity : AppCompatActivity() , CustomAdapt {
         val appInfo = intent.getSerializableExtra(EXTRA_APP_INFO) as? AppInfo
 
         if (appInfo != null) {
-            viewModel.setAppInfo(appInfo)
+            // ✅ 历史版本详情：保持监听 repo 的状态变化
+            viewModel.setHistoryAppInfo(appInfo)
         } else {
             val packageName = intent.getStringExtra(EXTRA_PACKAGE_NAME)
             if (packageName == null) {
@@ -54,9 +55,7 @@ class AppDetailActivity : AppCompatActivity() , CustomAdapt {
     }
 
     private fun setupViews() {
-        // Toolbar
-        binding.ivBack.setOnClickListener { 
-            // 优化返回逻辑：直接返回 MainActivity 并清除上层 Activity，以避免 Activity 堆栈过深
+        binding.ivBack.setOnClickListener {
             val intent = Intent(this, MainActivity::class.java)
             intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
             startActivity(intent)
@@ -72,13 +71,12 @@ class AppDetailActivity : AppCompatActivity() , CustomAdapt {
                     Log.d(TAG, "Attempting to open app. PackageName: ${currentAppInfo.packageName}")
                     val intent = packageManager.getLaunchIntentForPackage(currentAppInfo.packageName)
                     if (intent != null) {
-                        Log.d(TAG, "Launch intent created successfully. Starting activity...")
                         startActivity(intent)
                     } else {
-                        Log.e(TAG, "Failed to create launch intent. The app might not be launchable.")
                         Toast.makeText(this, "无法打开应用", Toast.LENGTH_SHORT).show()
                     }
                 } else {
+                    // ✅ toggleDownload 已按 taskKey 修复
                     AppRepository.toggleDownload(currentAppInfo)
                 }
             }
@@ -101,7 +99,6 @@ class AppDetailActivity : AppCompatActivity() , CustomAdapt {
             }
         }.attach()
 
-        // 遍历所有 Tab, 将文字左对齐
         for (i in 0 until binding.tabLayout.tabCount) {
             val tabView = (binding.tabLayout.getChildAt(0) as ViewGroup).getChildAt(i)
             if (tabView is ViewGroup) {
@@ -131,15 +128,12 @@ class AppDetailActivity : AppCompatActivity() , CustomAdapt {
             context.startActivity(intent)
         }
     }
+
     override fun isBaseOnWidth(): Boolean {
         return resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
     }
 
     override fun getSizeInDp(): Float {
-        return if (isBaseOnWidth()) {
-            411f
-        } else {
-            731f
-        }
+        return if (isBaseOnWidth()) 411f else 731f
     }
 }

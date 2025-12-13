@@ -15,8 +15,6 @@ import okhttp3.Request
 import okhttp3.Response
 import java.io.File
 import java.io.FileOutputStream
-import java.io.InputStream
-import java.io.OutputStream
 
 object XcServiceManager {
     private const val TAG = "XcServiceManager"
@@ -55,7 +53,7 @@ object XcServiceManager {
 
             if (realPackageName.isNullOrBlank()) {
                 Log.e(TAG, "Failed to parse APK, cannot get package name.")
-                file.delete() // Clean up invalid APK
+                file.delete()
                 return@withContext null
             }
             Log.d(TAG, "APK parsed successfully. PackageName: $realPackageName")
@@ -72,11 +70,17 @@ object XcServiceManager {
 
         } catch (e: Exception) {
             Log.e(TAG, "Download and install process failed.", e)
-            if (e is kotlinx.coroutines.CancellationException) throw e
+            if (e is CancellationException) throw e
             return@withContext null
         }
     }
 
+    /**
+     * ✅ 修复点：
+     *  - 如果本地存在文件会带 Range
+     *  - 服务器若返回 416（Range 不可用），说明本地文件/服务器长度不匹配（常见：本地已有完整文件或旧文件）
+     *    -> 删除本地文件 -> 不带 Range 重新请求一次
+     */
     private suspend fun downloadApkWithResume(
         appId: String,
         versionId: Long,
@@ -89,74 +93,100 @@ object XcServiceManager {
         if (!dir.exists()) dir.mkdirs()
         val file = File(dir, fileName)
 
-        val requestBuilder = Request.Builder().url(url)
-        var downloadedBytes = 0L
-        if (file.exists()) {
-            downloadedBytes = file.length()
-            Log.d(TAG, "[Resume] File exists with size: $downloadedBytes. Adding Range header.")
-            requestBuilder.addHeader("Range", "bytes=$downloadedBytes-")
-        }
+        suspend fun executeDownload(allowRange: Boolean): File? {
+            val requestBuilder = Request.Builder().url(url)
+            var downloadedBytes = 0L
 
-        val request = requestBuilder.build()
-        var response: Response? = null
-        try {
-            response = client.newCall(request).execute()
-            Log.d(TAG, "[Resume] Server responded with code: ${response.code}")
-
-            val isResumable = response.code == 206 && response.header("Content-Range") != null
-
-            if (!response.isSuccessful && !isResumable) {
-                Log.e(TAG, "Download failed: Server returned unsuccessful code ${response.code}")
-                return null
-            }
-            
-            if (file.exists() && downloadedBytes > 0 && !isResumable) {
-                Log.w(TAG, "[Resume] Server does not support resume (sent code ${response.code}). Restarting download.")
-                file.delete()
-                downloadedBytes = 0
+            if (allowRange && file.exists()) {
+                downloadedBytes = file.length()
+                Log.d(TAG, "[Resume] File exists with size: $downloadedBytes. Adding Range header.")
+                requestBuilder.addHeader("Range", "bytes=$downloadedBytes-")
             }
 
-            val body = response.body ?: return null
-            val totalBytes = body.contentLength() + downloadedBytes
-            Log.d(TAG, "[Resume] Starting download. Append: ${downloadedBytes > 0 && isResumable}, Downloaded: $downloadedBytes, ContentLength: ${body.contentLength()}, Total: $totalBytes")
+            val request = requestBuilder.build()
+            var response: Response? = null
+            try {
+                response = client.newCall(request).execute()
+                Log.d(TAG, "[Resume] Server responded with code: ${response.code}")
 
-            body.byteStream().use { inputStream ->
-                FileOutputStream(file, downloadedBytes > 0 && isResumable).use { outputStream ->
-                    var currentBytes = downloadedBytes
-                    val buffer = ByteArray(8192)
-                    var bytesRead: Int
+                // ✅ 416：Range 无效，交给外层做“删文件重试”
+                if (response.code == 416) {
+                    Log.w(TAG, "[Resume] Server returned 416. Range not satisfiable.")
+                    return null
+                }
 
-                    while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                        if (!currentCoroutineContext().isActive) {
-                            Log.d(TAG, "Download cancelled by coroutine.")
+                val isResumable = response.code == 206 && response.header("Content-Range") != null
+
+                if (!response.isSuccessful && !isResumable) {
+                    Log.e(TAG, "Download failed: Server returned unsuccessful code ${response.code}")
+                    return null
+                }
+
+                // 如果带了 Range 但服务器没给 206/Content-Range，说明不支持 resume：删文件重下（你原来就有这段）
+                if (file.exists() && downloadedBytes > 0 && !isResumable) {
+                    Log.w(TAG, "[Resume] Server does not support resume (sent code ${response.code}). Restarting download.")
+                    file.delete()
+                    downloadedBytes = 0
+                }
+
+                val body = response.body ?: return null
+                val totalBytes = body.contentLength() + downloadedBytes
+                Log.d(
+                    TAG,
+                    "[Resume] Starting download. Append: ${downloadedBytes > 0 && isResumable}, Downloaded: $downloadedBytes, ContentLength: ${body.contentLength()}, Total: $totalBytes"
+                )
+
+                body.byteStream().use { inputStream ->
+                    FileOutputStream(file, downloadedBytes > 0 && isResumable).use { outputStream ->
+                        var currentBytes = downloadedBytes
+                        val buffer = ByteArray(8192)
+                        var bytesRead: Int
+
+                        while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                            if (!currentCoroutineContext().isActive) {
+                                Log.d(TAG, "Download cancelled by coroutine.")
+                                return null
+                            }
+                            outputStream.write(buffer, 0, bytesRead)
+                            currentBytes += bytesRead
+                            if (totalBytes > 0) {
+                                val progress = ((currentBytes * 100) / totalBytes).toInt()
+                                withContext(Dispatchers.Main) { onProgress?.invoke(progress) }
+                            }
+                        }
+
+                        if (currentBytes < totalBytes && totalBytes > 0) {
+                            Log.e(TAG, "Download incomplete. Expected $totalBytes but got $currentBytes.")
                             return null
                         }
-                        outputStream.write(buffer, 0, bytesRead)
-                        currentBytes += bytesRead
-                        if (totalBytes > 0) {
-                            val progress = ((currentBytes * 100) / totalBytes).toInt()
-                            withContext(Dispatchers.Main) { onProgress?.invoke(progress) }
-                        }
-                    }
-
-                    if (currentBytes < totalBytes && totalBytes > 0) {
-                        Log.e(TAG, "Download incomplete. Expected $totalBytes but got $currentBytes.")
-                        return null
                     }
                 }
+
+                Log.d(TAG, "Download finished successfully: ${file.absolutePath}")
+                return file
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception during download.", e)
+                return null
+            } finally {
+                response?.close()
             }
-
-            Log.d(TAG, "Download finished successfully: ${file.absolutePath}")
-            return file
-
-        } catch (e: Exception) {
-            Log.e(TAG, "Exception during download.", e)
-            return null
-        } finally {
-            response?.close()
         }
+
+        // 1) 先按“断点续传”尝试（带 Range）
+        val first = executeDownload(allowRange = true)
+        if (first != null) return first
+
+        // 2) 如果失败且本地文件存在：很可能是 416 或不匹配，删掉重新下（不带 Range）
+        if (file.exists()) {
+            Log.w(TAG, "[Resume] Retry: deleting local file and downloading from scratch.")
+            file.delete()
+        }
+
+        // 3) 第二次：全量下载（不带 Range）
+        return executeDownload(allowRange = false)
     }
-    
+
     fun deleteDownloadedFile(appId: String, versionId: Long) {
         scope.launch {
             try {
