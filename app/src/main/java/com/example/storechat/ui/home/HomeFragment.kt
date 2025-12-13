@@ -196,7 +196,7 @@ class HomeFragment : Fragment() {
         val selectedTabPosition = binding.tabLayoutCategories.selectedTabPosition
         if (selectedTabPosition != TabLayout.Tab.INVALID_POSITION) {
             val category = AppCategory.values()[selectedTabPosition]
-            // ✅ 不要手动 VISIBLE；selectCategory() 会置 isLoading=true
+            // selectCategory() 会置 isLoading=true
             viewModel.selectCategory(requireContext(), category)
         }
     }

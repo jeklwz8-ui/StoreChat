@@ -48,6 +48,9 @@ object AppRepository {
     private val _checkUpdateResult = MutableLiveData<UpdateStatus?>()
     val checkUpdateResult: LiveData<UpdateStatus?> = _checkUpdateResult
 
+    private val _isLoading = MutableLiveData<Boolean>()
+    val isLoading: LiveData<Boolean> = _isLoading
+
     private val _selectedCategory = MutableLiveData(AppCategory.YANNUO)
 
     val categorizedApps: LiveData<List<AppInfo>> = MediatorLiveData<List<AppInfo>>().apply {
@@ -130,6 +133,7 @@ object AppRepository {
     }
 
     private suspend fun refreshAppsFromServer(context: Context, category: AppCategory?) {
+        _isLoading.postValue(true)
         try {
             val response = apiService.getAppList(
                 AppListRequestBody(appCategory = category?.id)
@@ -158,10 +162,12 @@ object AppRepository {
                         val finalPackageName = realPackageName ?: serverApp.appId
                         val installedVersionCode = AppUtils.getInstalledVersionCode(context, finalPackageName)
                         val isInstalled = installedVersionCode != -1L
+                        
+                        val serverVersionCode = serverApp.versionCode?.toLongOrNull()
 
                         val installState = when {
                             !isInstalled -> InstallState.NOT_INSTALLED
-                            (serverApp.versionCode?.toLongOrNull() ?: 0L) > installedVersionCode -> InstallState.INSTALLED_OLD
+                            serverVersionCode != null && serverVersionCode > installedVersionCode -> InstallState.INSTALLED_OLD
                             else -> InstallState.INSTALLED_LATEST
                         }
 
@@ -172,12 +178,15 @@ object AppRepository {
                     localAllApps = otherCategoryApps + mergedRemoteList
                     _allApps.postValue(localAllApps)
                 }
+                _isLoading.postValue(false) // Only set to false on success
+            } else {
+                // Keep loading on server error
+                _allApps.postValue(localAllApps.filter { it.category == category })
             }
         } catch (e: Exception) {
             e.printStackTrace()
-        } finally {
-            // 通知所有观察者数据加载完成
-            // 注意：这个实现可能需要进一步调整以适应具体需求
+            // Keep loading on network error
+            _allApps.postValue(localAllApps.filter { it.category == category })
         }
     }
 
@@ -237,6 +246,11 @@ object AppRepository {
 
                 addToDownloadQueue(app)
 
+                // 立即更新状态，提供快速的 UI 反馈
+                updateAppStatus(app.packageName) {
+                    it.copy(downloadStatus = DownloadStatus.DOWNLOADING, progress = 0)
+                }
+
                 val newJob = coroutineScope.launch(start = CoroutineStart.LAZY) {
                     try {
                         val realApkPath = resolveDownloadApkPath(app.appId, versionId)
@@ -244,9 +258,12 @@ object AppRepository {
                             throw IllegalStateException("Download URL is blank for versionId $versionId")
                         }
 
+                        // 移除此处冗余的状态更新，状态已在外面立即更新
+                        /*
                         updateAppStatus(app.packageName) {
                             it.copy(downloadStatus = DownloadStatus.DOWNLOADING, progress = 0)
                         }
+                        */
 
                         val installedPackageName = XcServiceManager.downloadAndInstall(
                             appId = app.appId,

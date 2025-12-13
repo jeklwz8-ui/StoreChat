@@ -22,6 +22,7 @@ import com.example.storechat.ui.download.DownloadQueueActivity
 import com.example.storechat.ui.search.SearchActivity
 import com.google.android.material.tabs.TabLayoutMediator
 import me.jessyan.autosize.internal.CustomAdapt
+import com.example.storechat.MainActivity // 导入 MainActivity
 
 class AppDetailActivity : AppCompatActivity() , CustomAdapt {
 
@@ -54,7 +55,12 @@ class AppDetailActivity : AppCompatActivity() , CustomAdapt {
 
     private fun setupViews() {
         // Toolbar
-        binding.ivBack.setOnClickListener { finish() }
+        binding.ivBack.setOnClickListener { 
+            // 优化返回逻辑：直接返回 MainActivity 并清除上层 Activity，以避免 Activity 堆栈过深
+            val intent = Intent(this, MainActivity::class.java)
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            startActivity(intent)
+        }
         binding.ivSearch.setOnClickListener { SearchActivity.start(this) }
         binding.ivDownload.setOnClickListener {
             startActivity(Intent(this, DownloadQueueActivity::class.java))
