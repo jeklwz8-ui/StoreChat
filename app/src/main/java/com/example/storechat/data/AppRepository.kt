@@ -28,6 +28,12 @@ object AppRepository {
      * taskKey = "packageName@versionId"
      */
     private val downloadJobs = ConcurrentHashMap<String, Job>()
+
+
+    private val refreshJobs = ConcurrentHashMap<Int, Job>()
+    private val lastFetchAt = ConcurrentHashMap<Int, Long>()
+    private const val MIN_FETCH_INTERVAL_MS = 1500L
+
     private val cancellationsForDeletion = ConcurrentHashMap.newKeySet<String>()
 
     private val apiService = ApiClient.appApi
@@ -143,17 +149,31 @@ object AppRepository {
     }
 
     fun initialize(context: Context) {
-        coroutineScope.launch {
-            refreshAppsFromServer(context, AppCategory.YANNUO)
-        }
+        requestAppList(context, AppCategory.YANNUO)
     }
 
     fun selectCategory(context: Context, category: AppCategory) {
         _selectedCategory.postValue(category)
-        coroutineScope.launch {
+        requestAppList(context, category)
+    }
+
+    private fun requestAppList(context: Context, category: AppCategory) {
+        val key = category.id
+        val now = System.currentTimeMillis()
+
+        // ✅ 1. 节流：1.5 秒内重复触发直接忽略
+        val last = lastFetchAt[key] ?: 0L
+        if (now - last < MIN_FETCH_INTERVAL_MS) return
+        lastFetchAt[key] = now
+
+        // ✅ 2. 单飞：该分类请求还在跑，就不再发第二次
+        if (refreshJobs[key]?.isActive == true) return
+
+        refreshJobs[key] = coroutineScope.launch {
             refreshAppsFromServer(context, category)
         }
     }
+
 
     private suspend fun refreshAppsFromServer(context: Context, category: AppCategory?) {
         _isLoading.postValue(true)
@@ -253,8 +273,8 @@ object AppRepository {
 
     /**
      * ✅ 方案B最关键修复点：
-     * 不再用 app.downloadStatus 决定“暂停/继续”，而是用 downloadJobs.containsKey(taskKey)
-     * 避免低版本详情页拿到的状态和真实 job 状态不一致，导致“一点就暂停”
+     * 不再用 app.downloadStatus 决定"暂停/继续"，而是用 downloadJobs.containsKey(taskKey)
+     * 避免低版本详情页拿到的状态和真实 job 状态不一致，导致"一点就暂停"
      */
     fun toggleDownload(app: AppInfo) {
         val versionId = app.versionId
@@ -267,17 +287,28 @@ object AppRepository {
 
         // ✅ 是否正在下载：只认 job
         val isDownloading = downloadJobs.containsKey(key)
+        
+        // ✅ 是否已暂停：检查状态
+        val isPaused = app.downloadStatus == DownloadStatus.PAUSED
 
         if (isDownloading) {
             downloadJobs[key]?.cancel()
             return
         }
+        
+        // 如果是暂停状态，则恢复下载而不是重新开始
+        if (isPaused) {
+            // 更新状态为下载中，但保留现有进度
+            updateAppStatus(app.packageName, versionId) {
+                it.copy(downloadStatus = DownloadStatus.DOWNLOADING)
+            }
+        } else {
+            // 开始新的下载
+            addToDownloadQueue(app)
 
-        // 开始/继续下载
-        addToDownloadQueue(app)
-
-        updateAppStatus(app.packageName, versionId) {
-            it.copy(downloadStatus = DownloadStatus.DOWNLOADING, progress = 0)
+            updateAppStatus(app.packageName, versionId) {
+                it.copy(downloadStatus = DownloadStatus.DOWNLOADING, progress = 0)
+            }
         }
 
         val newJob = coroutineScope.launch(start = CoroutineStart.LAZY) {

@@ -27,8 +27,18 @@ class AppDetailViewModel : ViewModel() {
 
     private val historyVersionCache = mutableMapOf<String, List<HistoryVersion>>()
 
-    // ✅ 历史版本展示覆盖（仅覆盖版本号/描述等，状态仍来自 repo）
+    // ✅ 历史版本详情：保存“你点击的那一条版本信息”（版本号/版本ID/安装状态）
     private var historyOverride: AppInfo? = null
+
+    // ✅ 缓存：最新版本基础信息（来自 allApps）
+    private var baseFromRepo: AppInfo? = null
+
+    init {
+        // ✅ 监听下载队列变化：用于刷新“历史版本”的按钮状态（下载中/暂停/进度）
+        _appInfo.addSource(AppRepository.downloadQueue) {
+            recomputeAppInfo()
+        }
+    }
 
     fun loadApp(packageName: String) {
         appInfoSource?.let { _appInfo.removeSource(it) }
@@ -38,31 +48,58 @@ class AppDetailViewModel : ViewModel() {
         }
 
         _appInfo.addSource(newSource) { appFromRepo ->
-            appFromRepo?.let { repoApp ->
-                val override = historyOverride
-                _appInfo.value = if (override != null) {
-                    repoApp.copy(
-                        versionId = override.versionId,
-                        versionName = override.versionName,
-                        description = override.description
-                    )
-                } else {
-                    repoApp
-                }
-            }
+            baseFromRepo = appFromRepo
+            recomputeAppInfo()
         }
 
         appInfoSource = newSource
     }
 
+    /**
+     * 最新版本详情：直接展示仓库状态
+     */
     fun setAppInfo(app: AppInfo) {
         historyOverride = null
         loadApp(app.packageName)
     }
 
+    /**
+     * ✅ 历史版本详情：展示该版本的 installState + 下载状态（按 packageName+versionId）
+     */
     fun setHistoryAppInfo(app: AppInfo) {
         historyOverride = app
         loadApp(app.packageName)
+    }
+
+    private fun recomputeAppInfo() {
+        val base = baseFromRepo ?: return
+        val override = historyOverride
+
+        // 最新版本详情
+        if (override == null) {
+            _appInfo.value = base
+            return
+        }
+
+        // ✅ 历史版本详情：去 downloadQueue 找到该版本的实时下载状态/进度
+        val queueItemForThisVersion = AppRepository.downloadQueue.value
+            ?.firstOrNull { it.packageName == base.packageName && it.versionId == override.versionId }
+
+        val statusSource = queueItemForThisVersion ?: override
+
+        _appInfo.value = base.copy(
+            // 版本信息必须使用历史版本
+            versionId = override.versionId,
+            versionName = override.versionName,
+            description = override.description,
+
+            // ✅ 安装状态也必须使用历史版本（从历史列表传进来）
+            installState = override.installState,
+
+            // ✅ 下载状态/进度使用该历史版本对应的队列项（如果存在）
+            downloadStatus = statusSource.downloadStatus,
+            progress = statusSource.progress
+        )
     }
 
     fun loadHistoryFor(context: Context, app: AppInfo) {

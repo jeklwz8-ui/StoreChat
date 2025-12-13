@@ -145,7 +145,7 @@ object XcServiceManager {
                         while (inputStream.read(buffer).also { bytesRead = it } != -1) {
                             if (!currentCoroutineContext().isActive) {
                                 Log.d(TAG, "Download cancelled by coroutine.")
-                                return null
+                                throw CancellationException("Cancelled by user")
                             }
                             outputStream.write(buffer, 0, bytesRead)
                             currentBytes += bytesRead
@@ -166,9 +166,15 @@ object XcServiceManager {
                 return file
 
             } catch (e: Exception) {
+                // ✅ 如果是取消，不要当失败，不要触发 retry
+                if (e is CancellationException) {
+                    Log.d(TAG, "Download cancelled (no retry).")
+                    throw e
+                }
                 Log.e(TAG, "Exception during download.", e)
                 return null
-            } finally {
+            }
+            finally {
                 response?.close()
             }
         }
